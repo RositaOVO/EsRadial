@@ -1,0 +1,11 @@
+html, body { margin: 0; width: 100%; height: 100%; background: transparent; pointer-events: none; }
+.radial { position: fixed; left: 0; top: 0; width: 100%; height: 100%; pointer-events: auto; }
+#ring { position: absolute; pointer-events: none; }
+.radial-slots { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.radial-slot { position: absolute; width: 32px; height: 32px; margin: -16px 0 0 -16px; pointer-events: none; }
+.radial-slot texture { width: 28px; height: 28px; margin: 2px; }
+.radial-label { position: absolute; left: 50%; top: 50%; width: 240px; margin: 112px 0 0 -120px;
+    color: #ffffff; font-size: 12px; text-align: center; pointer-events: none; }
+.radial-denial { position: absolute; left: 50%; top: 50%; width: 240px; margin: 130px 0 0 -120px;
+    color: #aeb7ba; font-size: 10px; text-align: center; pointer-events: none; }
+.radial-denial.unavailable { color: #ff7777; }

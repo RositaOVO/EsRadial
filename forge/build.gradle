@@ -1,0 +1,45 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
+}
+java { toolchain.languageVersion = JavaLanguageVersion.of(17); withSourcesJar() }
+base { archivesName = 'esradial-forge-1.20.1' }
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    runs {
+        client {
+            workingDirectory project.file('run')
+            mods { esradial { source sourceSets.main } }
+        }
+        server {
+            workingDirectory project.file('run')
+            args '--nogui'
+            mods { esradial { source sourceSets.main } }
+        }
+    }
+}
+repositories {
+    maven { url = 'https://maven.sighs.cc/repository/maven-public/' }
+}
+dependencies {
+    minecraft "net.minecraftforge:forge:1.20.1-${providers.gradleProperty('forgeVersion').orElse('47.4.22').get()}"
+    api project(':core')
+    implementation fg.deobf('com.sighs:ApricityUI-forge-1.20.1:1.2.3.1')
+}
+tasks.named('jar', Jar).configure {
+    from project(':core').sourceSets.main.output
+    from rootProject.file('LICENSE')
+    finalizedBy 'reobfJar'
+}
+tasks.named('sourcesJar', Jar).configure {
+    from project(':core').sourceSets.main.allSource
+}
+tasks.named('processResources').configure {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/mods.toml') { expand version: project.version }
+}
+publishing {
+    publications { mavenJava(MavenPublication) { artifact jar; artifact sourcesJar; artifactId = 'esradial-forge-1.20.1' } }
+    repositories { mavenLocal() }
+}
