@@ -14,6 +14,7 @@ import org.esradial.core.RadialSession;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /** ApricityUI draws the ring, textures and labels; only item/custom icons use Minecraft. */
 public final class AuiRadialRenderer implements RadialRenderer {
@@ -28,6 +29,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
     private long generation = -1, paintedRevision = -1;
     private int hovered = -2;
     private double width = -1, height = -1, animation = -1, progress = -1;
+    private RadialMenuData.Progress externalProgress = RadialMenuData.Progress.NONE;
 
     public AuiRadialRenderer() { this(DEFAULT_TEMPLATE); }
     public AuiRadialRenderer(String template) { this.template = template; }
@@ -68,9 +70,12 @@ public final class AuiRadialRenderer implements RadialRenderer {
         }
         int nextHover = session.hoveredIndex();
         double nextProgress = session.repeatProgress();
+        var nextExternalProgress = Objects.requireNonNullElse(menu.progress().get(), RadialMenuData.Progress.NONE);
         if (changed || nextHover != hovered || Math.abs(nextProgress - progress) > 0.001
+                || !nextExternalProgress.equals(externalProgress)
                 || Math.abs(animation - this.animation) > 0.001) {
             hovered = nextHover; progress = nextProgress; this.animation = animation;
+            externalProgress = nextExternalProgress;
             Document.runWithContext(document, () -> {
                 updateLabels(); positionIcons(animation); drawRing(animation);
             });
@@ -139,29 +144,61 @@ public final class AuiRadialRenderer implements RadialRenderer {
         var gradient = ctx.createRadialGradient(c, c, inner, c, c, outer);
         for (int i = 0; i < menu.ringColors().size(); i++)
             gradient.addColorStop(menu.ringColors().size() == 1 ? 0 : i / (double) (menu.ringColors().size() - 1), cssColor(menu.ringColors().get(i)));
-        ctx.setFillStyle(gradient);
-        sector(ctx, c, inner, outer, 0, Math.PI * 2); ctx.fill();
         int count = session.page().slots().size();
-        // A restrained segmented ring, matching Squad's interaction-wheel structure.
-        ctx.setStrokeStyle("rgba(205,211,211,0.28)"); ctx.setLineWidth(1);
-        for (int i = 0; count > 1 && i < count; i++) {
-            double a = -Math.PI / 2 + (i - 0.5) * Math.PI * 2 / count;
+        var sectors = menu.layout().sectors(count);
+        var blankGradient = ctx.createRadialGradient(c, c, inner, c, c, outer);
+        blankGradient.addColorStop(0, "rgba(36,41,43,0.37)");
+        blankGradient.addColorStop(1, "rgba(50,56,58,0.43)");
+        for (var area : sectors) {
+            ctx.setFillStyle(area.slotIndex() < 0 ? blankGradient : gradient);
+            sector(ctx, c, inner, outer, area.startRadians(), area.endRadians()); ctx.fill();
+        }
+        ctx.setStrokeStyle("rgba(213,222,216,0.27)"); ctx.setLineWidth(0.6);
+        for (var area : sectors) {
+            if (area.sweepDegrees() >= 360) continue;
+            double a = area.startRadians();
             ctx.beginPath(); ctx.moveTo(c + Math.cos(a) * inner, c + Math.sin(a) * inner);
             ctx.lineTo(c + Math.cos(a) * outer, c + Math.sin(a) * outer); ctx.stroke();
         }
+        // The outer outline stays visible even with no selection or active operation.
+        ctx.setStrokeStyle("rgba(226,234,229,0.8)"); ctx.setLineWidth(0.75);
         ctx.beginPath(); ctx.arc(c, c, outer, 0, Math.PI * 2); ctx.stroke();
+        ctx.setStrokeStyle("rgba(216,225,219,0.52)"); ctx.setLineWidth(0.65);
         ctx.beginPath(); ctx.arc(c, c, inner, 0, Math.PI * 2); ctx.stroke();
+        // The center track hugs the inside edge. A game-owned progress can continue here
+        // without a hovered button; repeat timing still belongs to the session alone.
+        double trackRadius = Math.max(0, inner - 2);
+        boolean progressOutside = hovered >= 0 && externalProgress.slotId() != null
+                && session.page().slots().get(hovered).id().equals(externalProgress.slotId());
+        if (!progressOutside && !(hovered >= 0 && progress > 0) && trackRadius > 0) {
+            ctx.setStrokeStyle("rgba(231,239,233,0.28)"); ctx.setLineWidth(1.5);
+            ctx.beginPath(); ctx.arc(c, c, trackRadius, 0, Math.PI * 2); ctx.stroke();
+            if (externalProgress.value() > 0) {
+                ctx.setStrokeStyle(cssColor(externalProgress.color()));
+                ctx.beginPath(); ctx.arc(c, c, trackRadius, -Math.PI / 2,
+                        -Math.PI / 2 + Math.PI * 2 * externalProgress.value()); ctx.stroke();
+            }
+        }
         if (hovered >= 0 && hovered < count) {
             var selected = session.page().slots().get(hovered);
-            double step = Math.PI * 2 / count;
-            double start = -Math.PI / 2 + hovered * step - step / 2;
+            var area = menu.layout().sectorForSlot(hovered, count);
+            double start = area.startRadians(), end = area.endRadians();
             ctx.setFillStyle(selected.enabled() ? "rgba(222,228,230,0.24)" : "rgba(130,50,45,0.28)");
-            sector(ctx, c, inner, outer, start, start + step); ctx.fill();
-            ctx.setStrokeStyle("rgba(255,255,255,0.85)"); ctx.setLineWidth(1);
-            sector(ctx, c, inner, outer, start, start + step); ctx.stroke();
-            if (progress > 0) {
-                ctx.setStrokeStyle(cssColor(selected.value().color())); ctx.setLineWidth(3);
-                ctx.beginPath(); ctx.arc(c, c, outer - 2, start, start + step * progress); ctx.stroke();
+            sector(ctx, c, inner, outer, start, end); ctx.fill();
+            ctx.setStrokeStyle("rgba(247,249,248,0.85)"); ctx.setLineWidth(0.7);
+            for (double angle : new double[]{start, end}) {
+                ctx.beginPath(); ctx.moveTo(c + Math.cos(angle) * inner, c + Math.sin(angle) * inner);
+                ctx.lineTo(c + Math.cos(angle) * outer, c + Math.sin(angle) * outer); ctx.stroke();
+            }
+            // Keep the whole selected arc lit, including before pressing the mouse.
+            ctx.setStrokeStyle(selected.enabled() ? cssColor(selected.value().color()) : "rgba(255,119,119,0.5)");
+            ctx.setLineWidth(1.5);
+            ctx.beginPath(); ctx.arc(c, c, Math.max(0, outer - 1), start, end); ctx.stroke();
+            double value = progressOutside ? externalProgress.value() : progress;
+            if (selected.enabled() && value > 0) {
+                ctx.setStrokeStyle(progressOutside ? cssColor(externalProgress.color()) : cssColor(selected.value().color()));
+                ctx.setLineWidth(2.5);
+                ctx.beginPath(); ctx.arc(c, c, Math.max(0, outer - 1), start, start + (end - start) * value); ctx.stroke();
             }
         }
     }

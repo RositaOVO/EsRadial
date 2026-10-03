@@ -21,6 +21,7 @@ public final class RadialSession<T> {
             if (id == null || id.isBlank()) throw new IllegalArgumentException("Empty page id");
             Objects.requireNonNull(layout); slots = List.copyOf(slots);
             if (slots.size() > 64) throw new IllegalArgumentException("Maximum 64 slots per page");
+            layout.validateSlots(slots.size());
             HashSet<String> ids = new HashSet<>();
             for (Slot<T> slot : slots) if (!ids.add(slot.id()))
                 throw new IllegalArgumentException("Duplicate slot id: " + slot.id());
