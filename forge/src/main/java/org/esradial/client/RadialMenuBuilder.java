@@ -18,12 +18,14 @@ public final class RadialMenuBuilder {
     private float speed = 1.25f;
     private final List<RadialSession.Slot<RadialMenuData.Visual>> slots = new ArrayList<>();
     private final List<RadialLayout.Sector> sectors = new ArrayList<>();
+    private boolean squadLayout;
     private Supplier<RadialMenuData.Progress> progress = () -> RadialMenuData.Progress.NONE;
     public RadialMenuBuilder(ResourceLocation id) { this.id = id; }
     public RadialMenuBuilder title(Component title) { this.title = title; return this; }
     public RadialMenuBuilder radii(double inner, double outer) { layout = new RadialLayout(inner, outer); return this; }
     public RadialMenuBuilder animationSpeed(float speed) { this.speed = speed; return this; }
     public RadialMenuBuilder ringColors(List<String> colors) { this.colors = List.copyOf(colors); return this; }
+    public RadialMenuBuilder squadLayout() { squadLayout = true; return this; }
     /** Position the last action explicitly; omitted angles become inert blank sectors. */
     public RadialMenuBuilder sectorLast(double startDegrees, double sweepDegrees) {
         last(); sectors.add(new RadialLayout.Sector(startDegrees, sweepDegrees, slots.size() - 1)); return this;
@@ -80,6 +82,10 @@ public final class RadialMenuBuilder {
         if (slots.isEmpty()) throw new IllegalStateException("Add a slot first");
         return slots.get(slots.size() - 1);
     }
-    public RadialMenuData build() { return new RadialMenuData(id, title,
-            new RadialLayout(layout.innerRadius(), layout.outerRadius(), sectors), slots, colors, speed, progress); }
+    public RadialMenuData build() {
+        RadialLayout geometry = squadLayout && sectors.isEmpty()
+                ? RadialLayout.squad(layout.innerRadius(), layout.outerRadius(), slots.size())
+                : new RadialLayout(layout.innerRadius(), layout.outerRadius(), sectors);
+        return new RadialMenuData(id, title, geometry, slots, colors, speed, progress);
+    }
 }

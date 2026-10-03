@@ -21,6 +21,26 @@ public record RadialLayout(double innerRadius, double outerRadius, List<RadialLa
         public boolean contains(double degrees) { return normalize(degrees - startDegrees) < sweepDegrees; }
     }
     public RadialLayout(double innerRadius, double outerRadius) { this(innerRadius, outerRadius, List.of()); }
+    /** A sparse preset for arbitrary catalogs: unequal action sectors and two inert gaps. */
+    public static RadialLayout squad(double innerRadius, double outerRadius, int count) {
+        if (count < 0 || count > 64) throw new IllegalArgumentException("Invalid slot count");
+        if (count == 0) return new RadialLayout(innerRadius, outerRadius);
+        double[] weights = {55, 45, 60, 35, 55, 35};
+        double total = 75;
+        for (int i = 0; i < count; i++) total += weights[i % weights.length];
+        double unit = 360 / total, angle = -weights[0] * unit / 2;
+        int firstGap = (count - 1) / 2, secondGap = Math.max(firstGap + 1, count - 2);
+        List<Sector> areas = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            double sweep = weights[i % weights.length] * unit;
+            areas.add(new Sector(angle, sweep, i)); angle += sweep;
+            if (i == firstGap) { areas.add(new Sector(angle, 40 * unit, -1)); angle += 40 * unit; }
+            if (i == secondGap) { areas.add(new Sector(angle, 35 * unit, -1)); angle += 35 * unit; }
+        }
+        // One/two-action menus may reach the second gap after the last action.
+        if (secondGap >= count) areas.add(new Sector(angle, 35 * unit, -1));
+        return new RadialLayout(innerRadius, outerRadius, areas);
+    }
     public RadialLayout {
         if (!Double.isFinite(innerRadius) || !Double.isFinite(outerRadius)
                 || innerRadius < 0 || outerRadius <= innerRadius || outerRadius > 512) {

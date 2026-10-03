@@ -88,7 +88,10 @@ public final class AuiRadialRenderer implements RadialRenderer {
             Element node = nodes.get(slot.id());
             if (node == null) {
                 node = document.createElement("div"); node.setAttribute("data-id", slot.id());
-                node.setAttribute("class", "radial-slot"); slots.appendChild(node); nodes.put(slot.id(), node);
+                node.setAttribute("class", "radial-slot");
+                // AUI upgrades a generic DIV on insertion and returns the connected instance.
+                // All further child/style mutations must target that instance, not the origin.
+                node = slots.appendChild(node); nodes.put(slot.id(), node);
             }
             var visual = slot.value();
             String source = visual.texture() == null ? "" : visual.texture().toString();

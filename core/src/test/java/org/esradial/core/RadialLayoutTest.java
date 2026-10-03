@@ -6,6 +6,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RadialLayoutTest {
+    @Test void sparsePresetSupportsEveryCatalogSizeWithoutSelectingGaps() {
+        for (int count = 1; count <= 64; count++) {
+            var geometry = RadialLayout.squad(44, 100, count); geometry.validateSlots(count);
+            assertEquals(360, geometry.sectors().stream().mapToDouble(RadialLayout.Sector::sweepDegrees).sum(), 1e-8);
+            assertEquals(2, geometry.sectors().stream().filter(area -> area.slotIndex() < 0).count());
+            for (int index = 0; index < count; index++)
+                assertEquals(index, geometry.hitIndex(geometry.slotX(index, count), geometry.slotY(index, count), count));
+            for (var area : geometry.sectors()) if (area.slotIndex() < 0)
+                assertEquals(-1, geometry.hitIndex(Math.sin(area.centerRadians()) * 80,
+                        -Math.cos(area.centerRadians()) * 80, count));
+        }
+    }
     private RadialLayout layout() {
         return new RadialLayout(44, 100, List.of(new RadialLayout.Sector(-30, 55, 0),
                 new RadialLayout.Sector(25, 45, 1), new RadialLayout.Sector(170, 35, 2)));
