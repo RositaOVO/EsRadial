@@ -3,6 +3,7 @@ package org.esradial.client;
 import com.sighs.apricityui.ApricityUI;
 import com.sighs.apricityui.canvas.CanvasRenderingContext2D;
 import com.sighs.apricityui.element.Canvas;
+import com.sighs.apricityui.element.Texture;
 import com.sighs.apricityui.init.Document;
 import com.sighs.apricityui.init.Element;
 import com.sighs.apricityui.layout.Position;
@@ -89,7 +90,9 @@ public final class AuiRadialRenderer implements RadialRenderer {
             if (!source.equals(node.getAttribute("data-texture"))) {
                 for (Element child : new ArrayList<>(node.children)) child.remove();
                 if (!source.isEmpty()) {
-                    Element texture = document.createElement("texture"); texture.setAttribute("src", source);
+                    // Document.createElement creates a plain Element, even for registered tags.
+                    // Instantiate the AUI texture renderer so the source is actually drawn.
+                    Element texture = new Texture(document); texture.setAttribute("src", source);
                     node.appendChild(texture);
                 }
                 node.setAttribute("data-texture", source);
@@ -103,7 +106,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
             var slot = session.page().slots().get(i); Element node = nodes.get(slot.id());
             double x = width / 2 + menu.layout().slotX(i, count) * animation;
             double y = height / 2 + menu.layout().slotY(i, count) * animation;
-            node.setAttribute("style", "left:" + x + "px;top:" + y + "px;opacity:"
+            node.setAttribute("style", "left:" + (x - 16) + "px;top:" + (y - 16) + "px;opacity:"
                     + animation * (slot.enabled() ? 1 : 0.35) + ";color:" + cssColor(slot.value().color()) + ";");
             node.setAttribute("class", "radial-slot" + (i == hovered ? " hovered" : "") + (!slot.enabled() ? " disabled" : ""));
         }
@@ -116,8 +119,11 @@ public final class AuiRadialRenderer implements RadialRenderer {
             : selected != null && selected.repeatTicks() > 0 ? "按住左键持续操作 · 右键返回"
             : "左键选择 · 右键返回/关闭");
         double labelTop = menu.layout().outerRadius() + 16;
-        label.setAttribute("style", "margin-top:" + labelTop + "px;");
-        denial.setAttribute("style", "margin-top:" + (labelTop + 28) + "px;");
+        // Keep all overlay positions in the same document coordinate space as the ring.
+        // AUI absolute positioning does not match browser negative-margin centering.
+        String labelLeft = "left:" + (width - 240) / 2 + "px;";
+        label.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop) + "px;margin:0;");
+        denial.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop + 28) + "px;margin:0;");
         root.setAttribute("style", "opacity:" + this.animation + ";");
     }
     private void drawRing(double animation) {
