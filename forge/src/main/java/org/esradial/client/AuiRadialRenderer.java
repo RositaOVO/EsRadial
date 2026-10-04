@@ -30,6 +30,21 @@ public final class AuiRadialRenderer implements RadialRenderer {
     private int hovered = -2;
     private double width = -1, height = -1, animation = -1, progress = -1;
     private RadialMenuData.Progress externalProgress = RadialMenuData.Progress.NONE;
+    private String editorHint;
+    private int editorPiece = -1;
+    private boolean editorChanged;
+    private int editorDragged = -1;
+    private double editorDragX, editorDragY;
+
+    public void setEditorDrag(int piece, double x, double y) {
+        if (editorDragged != piece || (piece >= 0 && (editorDragX != x || editorDragY != y))) editorChanged = true;
+        editorDragged = piece; editorDragX = x; editorDragY = y;
+    }
+
+    public void setEditorHint(String hint, int piece) {
+        if (!Objects.equals(editorHint, hint) || editorPiece != piece) editorChanged = true;
+        editorHint = hint; editorPiece = piece;
+    }
 
     public AuiRadialRenderer() { this(DEFAULT_TEMPLATE); }
     public AuiRadialRenderer(String template) { this.template = template; }
@@ -62,7 +77,8 @@ public final class AuiRadialRenderer implements RadialRenderer {
         this.menu = menu; this.session = session;
         Size size = document.getViewportSize();
         boolean resized = width != size.width() || height != size.height();
-        boolean changed = resized || paintedRevision != session.revision();
+        boolean changed = resized || paintedRevision != session.revision() || editorChanged;
+        editorChanged = false;
         if (changed) {
             width = size.width(); height = size.height();
             Document.runWithContext(document, () -> syncSlots(animation));
@@ -114,6 +130,9 @@ public final class AuiRadialRenderer implements RadialRenderer {
             var slot = session.page().slots().get(i); Element node = nodes.get(slot.id());
             double x = width / 2 + menu.layout().slotX(i, count) * animation;
             double y = height / 2 + menu.layout().slotY(i, count) * animation;
+            if (editorDragged >= 0 && menu.layout().sectors().get(editorDragged).slotIndex() == i) {
+                x = width / 2 + editorDragX; y = height / 2 + editorDragY;
+            }
             node.setAttribute("style", "left:" + (x - 16) + "px;top:" + (y - 16) + "px;opacity:"
                     + animation * (slot.enabled() ? 1 : 0.35) + ";color:" + cssColor(slot.value().color()) + ";");
             node.setAttribute("class", "radial-slot" + (i == hovered ? " hovered" : "") + (!slot.enabled() ? " disabled" : ""));
@@ -121,15 +140,18 @@ public final class AuiRadialRenderer implements RadialRenderer {
     }
     private void updateLabels() {
         var selected = session.hovered();
-        label.setTextContent(selected == null ? menu.title().getString() : selected.value().label().getString());
+        label.setTextContent(editorHint == null ? selected == null ? menu.title().getString() : selected.value().label().getString()
+            : editorHint);
         denial.setAttribute("class", "radial-denial" + (selected != null && !selected.enabled() ? " unavailable" : ""));
-        denial.setTextContent(selected != null && !selected.enabled() ? selected.value().denial().getString()
-            : selected != null && selected.repeatTicks() > 0 ? "按住左键持续操作 · 右键返回"
-            : "左键选择 · 右键返回/关闭");
+        denial.setTextContent(editorHint != null ? "滚轮旋转 · Enter保存 · Esc取消 · R重置"
+            : selected != null && !selected.enabled() ? selected.value().denial().getString() + " · F6编辑"
+            : selected != null && selected.repeatTicks() > 0 ? "按住左键操作 · 右键返回 · F6编辑"
+            : "左键选择 · 右键返回 · F6编辑");
         double labelTop = menu.layout().outerRadius() + 16;
         // Keep all overlay positions in the same document coordinate space as the ring.
         // AUI absolute positioning does not match browser negative-margin centering.
-        String labelLeft = "left:" + (width - 240) / 2 + "px;";
+        double textWidth = editorHint == null ? 240 : Math.min(440, width - 16);
+        String labelLeft = "left:" + (width - textWidth) / 2 + "px;width:" + textWidth + "px;";
         label.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop) + "px;margin:0;");
         denial.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop + 28) + "px;margin:0;");
         root.setAttribute("style", "opacity:" + this.animation + ";");
@@ -155,6 +177,28 @@ public final class AuiRadialRenderer implements RadialRenderer {
         for (var area : sectors) {
             ctx.setFillStyle(area.slotIndex() < 0 ? blankGradient : gradient);
             sector(ctx, c, inner, outer, area.startRadians(), area.endRadians()); ctx.fill();
+        }
+        if (editorHint != null) {
+            if (editorDragged >= 0 && sectors.get(editorDragged).slotIndex() < 0) {
+                ctx.setStrokeStyle("rgba(245,210,110,0.95)"); ctx.setLineWidth(2);
+                ctx.beginPath(); ctx.arc(c + editorDragX, c + editorDragY, 6, 0, Math.PI * 2); ctx.stroke();
+            }
+            if (editorPiece >= 0 && editorPiece < sectors.size()) {
+                var area = sectors.get(editorPiece);
+                ctx.setFillStyle("rgba(222,228,230,0.24)");
+                sector(ctx, c, inner, outer, area.startRadians(), area.endRadians()); ctx.fill();
+            }
+            for (var area : sectors) {
+                double a = area.startRadians(), r = (inner + outer) / 2;
+                ctx.setFillStyle("rgba(245,210,110,0.95)");
+                ctx.beginPath(); ctx.arc(c + Math.cos(a) * outer, c + Math.sin(a) * outer, 2.5, 0, Math.PI * 2); ctx.fill();
+                if (area.slotIndex() < 0) {
+                    double mid = (area.startRadians() + area.endRadians()) / 2;
+                    double x = c + Math.cos(mid) * r, y = c + Math.sin(mid) * r;
+                    ctx.setStrokeStyle("rgba(218,226,222,0.7)"); ctx.setLineWidth(1);
+                    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.stroke();
+                }
+            }
         }
         ctx.setStrokeStyle("rgba(213,222,216,0.27)"); ctx.setLineWidth(0.6);
         for (var area : sectors) {
@@ -226,8 +270,11 @@ public final class AuiRadialRenderer implements RadialRenderer {
         for (int i = 0; i < count; i++) {
             var slot = session.page().slots().get(i); var v = slot.value();
             if (v.item().isEmpty() && v.nativeIcon() == null) continue;
-            Position center = document.documentToGuiPosition(new Position(width / 2 + menu.layout().slotX(i, count) * animation,
-                    height / 2 + menu.layout().slotY(i, count) * animation));
+            double x = menu.layout().slotX(i, count) * animation, y = menu.layout().slotY(i, count) * animation;
+            if (editorDragged >= 0 && menu.layout().sectors().get(editorDragged).slotIndex() == i) {
+                x = editorDragX; y = editorDragY;
+            }
+            Position center = document.documentToGuiPosition(new Position(width / 2 + x, height / 2 + y));
             Position unit = document.documentToGuiPosition(new Position(1, 0));
             Position zero = document.documentToGuiPosition(new Position(0, 0));
             float scale = (float) (unit.x - zero.x);

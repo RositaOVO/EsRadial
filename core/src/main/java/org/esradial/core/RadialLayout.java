@@ -58,7 +58,9 @@ public record RadialLayout(double innerRadius, double outerRadius, List<RadialLa
                 throw new IllegalArgumentException("Duplicate sector slot index");
             double end = sector.startDegrees + sector.sweepDegrees;
             intervals.add(new double[]{sector.startDegrees, Math.min(360, end)});
-            if (end > 360) intervals.add(new double[]{0, end - 360});
+            // Rotating contiguous sectors can put an endpoint a few ulps above 360.
+            // Do not turn that rounding tail into a second interval at zero.
+            if (end > 360 + 1e-9) intervals.add(new double[]{0, end - 360});
         }
         intervals.sort(Comparator.comparingDouble(interval -> interval[0]));
         List<Sector> result = new ArrayList<>(source);

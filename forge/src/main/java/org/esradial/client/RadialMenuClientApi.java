@@ -33,6 +33,7 @@ public final class RadialMenuClientApi {
     private static long animationStart;
     private static double closeFrom = 1;
     private static RadialMenuData menu;
+    private static RadialMenuData defaultMenu;
     private static RadialSession<RadialMenuData.Visual> session;
     private static OpenOptions options;
     private static RadialRenderer renderer;
@@ -61,10 +62,12 @@ public final class RadialMenuClientApi {
         Objects.requireNonNull(data); Objects.requireNonNull(openOptions);
         Minecraft mc = Minecraft.getInstance();
         if (isActive() || mc.player == null || mc.level == null || mc.screen != null || !mc.isWindowActive()) return false;
+        RadialMenuData original = data;
+        data = RadialLayouts.apply(data);
         RadialRenderer view = Objects.requireNonNull(rendererFactory.get());
         try { if (!view.open(data)) { view.close(); return false; } }
         catch (RuntimeException error) { view.close(); LogUtils.getLogger().error("EsRadial template could not open", error); return false; }
-        menu = data; options = openOptions; renderer = view; closing = false;
+        menu = data; defaultMenu = original; options = openOptions; renderer = view; closing = false;
         session = new RadialSession<>(data.page(), RadialMenuClientApi::beginClose);
         history.clear();
         session.seedPrimary(GLFW.glfwGetMouseButton(mc.getWindow().getWindow(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS);
@@ -85,21 +88,35 @@ public final class RadialMenuClientApi {
     }
     public static boolean replace(RadialMenuData data) {
         requireClientThread(); if (session == null || closing) return false;
-        menu = data; session.replace(data.page()); return true;
+        defaultMenu = data; menu = RadialLayouts.apply(data); session.replace(menu.page()); return true;
     }
     public static boolean navigate(RadialMenuData data) {
         requireClientThread(); if (session == null || closing) return false;
-        history.push(menu); session.push(data.page()); menu = data; return true;
+        history.push(defaultMenu); defaultMenu = data;
+        menu = RadialLayouts.apply(data); session.push(menu.page()); return true;
     }
     public static boolean back() {
         requireClientThread(); if (session == null || closing || !session.back()) return false;
-        menu = history.pop(); return true;
+        defaultMenu = history.pop(); menu = RadialLayouts.apply(defaultMenu);
+        session.replace(menu.page()); return true;
     }
     public static boolean confirmHovered() {
         requireClientThread(); if (session == null || closing) return false;
         updateHover();
         try { return session.confirmRelease(); }
         catch (RuntimeException error) { LogUtils.getLogger().error("EsRadial action failed", error); return false; }
+    }
+    /** End the action session before entering a separate inert editor screen. */
+    public static boolean editCurrentLayout() {
+        requireClientThread();
+        if (session == null || closing) return false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null || mc.screen != null || mc.player.isDeadOrDying()
+                || !mc.isWindowActive()) return false;
+        var editor = new RadialLayoutEditorScreen(defaultMenu, menu);
+        close(); finishClose();
+        mc.setScreen(editor);
+        return true;
     }
     public static void close() {
         requireClientThread(); if (session != null) session.close(RadialSession.CloseReason.CANCEL);
@@ -117,7 +134,7 @@ public final class RadialMenuClientApi {
         try { if (renderer != null) renderer.close(); }
         finally {
             boolean restore = restoreMouse;
-            session = null; menu = null; renderer = null; options = null; closing = restoreMouse = false; history.clear();
+            session = null; menu = defaultMenu = null; renderer = null; options = null; closing = restoreMouse = false; history.clear();
             // A newly opened Screen or a lost window owns cursor restoration now.
             if (restore && mc.player != null && mc.level != null && mc.screen == null
                     && mc.getOverlay() == null && mc.isWindowActive()) mc.mouseHandler.grabMouse();
@@ -167,6 +184,9 @@ public final class RadialMenuClientApi {
         }
     }
     private static void onKey(InputEvent.Key event) {
+        if (session != null && !closing && event.getKey() == GLFW.GLFW_KEY_F6 && event.getAction() == GLFW.GLFW_PRESS) {
+            editCurrentLayout(); return;
+        }
         if (session != null && event.getKey() == GLFW.GLFW_KEY_ESCAPE && event.getAction() == GLFW.GLFW_PRESS) close();
     }
     private static void render(RenderGuiEvent.Post event) {
