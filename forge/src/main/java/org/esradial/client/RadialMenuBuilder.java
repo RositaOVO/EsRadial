@@ -18,14 +18,21 @@ public final class RadialMenuBuilder {
     private float speed = 1.25f;
     private final List<RadialSession.Slot<RadialMenuData.Visual>> slots = new ArrayList<>();
     private final List<RadialLayout.Sector> sectors = new ArrayList<>();
-    private boolean squadLayout;
+    private int backIndex = -1;
     private Supplier<RadialMenuData.Progress> progress = () -> RadialMenuData.Progress.NONE;
     public RadialMenuBuilder(ResourceLocation id) { this.id = id; }
     public RadialMenuBuilder title(Component title) { this.title = title; return this; }
     public RadialMenuBuilder radii(double inner, double outer) { layout = new RadialLayout(inner, outer); return this; }
     public RadialMenuBuilder animationSpeed(float speed) { this.speed = speed; return this; }
     public RadialMenuBuilder ringColors(List<String> colors) { this.colors = List.copyOf(colors); return this; }
-    public RadialMenuBuilder squadLayout() { squadLayout = true; return this; }
+    /** Compatibility spelling; clock placement is now the default. */
+    public RadialMenuBuilder squadLayout() { return this; }
+    public RadialMenuBuilder backSlot(Runnable action) {
+        slot("esradial.back", ResourceLocation.fromNamespaceAndPath("esradial", "textures/squad/radialbackicon.png"),
+            action, Component.literal("返回"), "#FFD5B25C", false).submenuLast();
+        backIndex = slots.size() - 1;
+        return this;
+    }
     /** Position the last action explicitly; omitted angles become inert blank sectors. */
     public RadialMenuBuilder sectorLast(double startDegrees, double sweepDegrees) {
         last(); sectors.add(new RadialLayout.Sector(startDegrees, sweepDegrees, slots.size() - 1)); return this;
@@ -63,14 +70,33 @@ public final class RadialMenuBuilder {
     }
     private RadialMenuBuilder add(String id, ResourceLocation texture, ItemStack item, IRadialIcon nativeIcon,
             Runnable action, Component label, String color, String highlight, boolean close) {
+        boolean back = id.equals("esradial.back") || id.endsWith(".back");
         slots.add(new RadialSession.Slot<>(id, new RadialMenuData.Visual(label, texture, item,
-                nativeIcon, color, highlight, Component.empty()), true, close, 0, action)); return this;
+                nativeIcon, color, highlight, Component.empty()), true, back ? false : close, 0, action, back));
+        if (back) backIndex = slots.size() - 1;
+        return this;
     }
     public RadialMenuBuilder disabledLast(Component reason) {
         var slot = last(); var v = slot.value();
         slots.set(slots.size() - 1, new RadialSession.Slot<>(slot.id(), new RadialMenuData.Visual(v.label(),
-                v.texture(), v.item(), v.nativeIcon(), v.color(), v.highlight(), reason), false,
+                v.texture(), v.item(), v.nativeIcon(), v.color(), v.highlight(), reason, v.textureTint()), false,
                 slot.closeAfterAction(), slot.repeatTicks(), slot.action(), slot.navigation())); return this;
+    }
+    /** Multiply texture RGB while retaining its alpha and internal dark details. */
+    public RadialMenuBuilder tintLast(int argb) {
+        var slot=last(); var v=slot.value();
+        slots.set(slots.size()-1,new RadialSession.Slot<>(slot.id(),new RadialMenuData.Visual(v.label(),v.texture(),
+            v.item(),v.nativeIcon(),v.color(),v.highlight(),v.denial(),argb),slot.enabled(),slot.closeAfterAction(),
+            slot.repeatTicks(),slot.action(),slot.navigation()));
+        return this;
+    }
+    /** Color of a held action's progress; its normal hover rim keeps the slot color. */
+    public RadialMenuBuilder progressColorLast(String color) {
+        var slot=last(); var v=slot.value();
+        slots.set(slots.size()-1,new RadialSession.Slot<>(slot.id(),new RadialMenuData.Visual(v.label(),v.texture(),
+            v.item(),v.nativeIcon(),v.color(),color,v.denial(),v.textureTint()),slot.enabled(),slot.closeAfterAction(),
+            slot.repeatTicks(),slot.action(),slot.navigation()));
+        return this;
     }
     /** A directory: click enters; releasing an opening key can never enter it. */
     public RadialMenuBuilder submenuLast() {
@@ -89,8 +115,8 @@ public final class RadialMenuBuilder {
         return slots.get(slots.size() - 1);
     }
     public RadialMenuData build() {
-        RadialLayout geometry = squadLayout && sectors.isEmpty()
-                ? RadialLayout.squad(layout.innerRadius(), layout.outerRadius(), slots.size())
+        RadialLayout geometry = sectors.isEmpty()
+                ? org.esradial.core.RadialClockLayout.create(layout.innerRadius(), layout.outerRadius(), slots.size(), backIndex)
                 : new RadialLayout(layout.innerRadius(), layout.outerRadius(), sectors);
         return new RadialMenuData(id, title, geometry, slots, colors, speed, progress);
     }

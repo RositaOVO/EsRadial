@@ -2,14 +2,14 @@
 
 用 ApricityUI 实现的通用 Minecraft 轮盘库。当前支持 Forge 1.20.1、Java 17、ApricityUI 1.2.6。
 
-默认外观参考 Squad：半透明深灰圆环、分隔线、简单图标、浅灰选中区域和轮盘下方的文字。使用用户提供的 UI.zip 目录和工事图标，没有 AuraTip 依赖。
+默认外观参考 Squad：半透明深灰圆环、分隔线、简单图标、浅灰选中区域和轮盘中心的悬停名称和小号说明。使用用户提供的 UI.zip 目录和工事图标，没有 AuraTip 依赖。
 
 ## 玩家操作
 
 - 按住调用模组的轮盘键打开；向图标所在方向移动鼠标即可选中，移到圆环外也有效。
 - 左键点击执行；点击菜单入口进入子菜单，保持同一个 Overlay，不会关了再闪一下。
 - 松开打开键只关闭轮盘，不执行选项。库也支持由方块右键打开的普通点击模式。
-- 点击轮盘内圈上半部的返回按钮回到上一级；右键不执行导航。Esc、死亡、断线、打开其他 Screen、失去窗口焦点也会结束会话。
+- 点击左上方返回扇区回到上一级；右键不执行导航。Esc、死亡、断线、打开其他 Screen、失去窗口焦点也会结束会话。
 - 中心是安全区，不选中外围选项。Espetro 的载具中心额外由原有上车系统提供左键读条。
 - 持续操作选项支持按住左键重复执行；松开左键、移到中心或不可用项目就停止。
 - AUI 圆环画布按实际屏幕像素密度绘制，缩放 GUI 时同步调整清晰度，鼠标仍使用同一逻辑坐标。
@@ -28,7 +28,7 @@
 
 共享指挥入口、分类目录和吸附说明见 [分类轮盘](docs/SQUAD-TREE.md)。
 
-本次 EsRadial、EsPoints、Espetro 的完整更新大纲、设计图和实机配图见 [更新总结](docs/updates/2026-10-11/README.md)，附 10 页 PDF。
+最新时钟排版、工事三分类和实机配图见 [本次更新](docs/updates/2026-10-11-clock/README.md)，附PDF；[此前累计更新](docs/updates/2026-10-11/README.md)仅作为历史记录。
 
 ## 模组作者怎么接
 
@@ -40,7 +40,8 @@ EsRadial 负责画轮盘、接鼠标、切换页面、持续操作和关闭后�
 var build = new RadialMenuBuilder(new ResourceLocation("mymod", "build"))
     .title(Component.literal("建造"))
     .slot("hab", new ResourceLocation("mymod", "textures/gui/hab.png"),
-        () -> requestHabPlacement(), Component.literal("兵站 · 建材 500"), "#FFFFFFFF")
+        () -> requestHabPlacement(), Component.literal("兵站 (建材 500)"), "#FFFFFFFF")
+    .backSlot(() -> RadialMenuClientApi.back())
     .build();
 var root = new RadialMenuBuilder(new ResourceLocation("mymod", "root"))
     .title(Component.literal("指挥菜单"))
@@ -55,9 +56,11 @@ RadialMenuClientApi.open(root,
 
 持续装卸用 `.persistentSlot(...).repeatLast(intervalTicks)`；不可用项目追加 `.disabledLast(Component.literal("弹药不足"))`。`intervalTicks` 必须来自游戏规则，服务端仍校验权限、距离、余额和请求频率。
 
-需要固定位置时，在每个按钮后追加 `.sectorLast(startDegrees, sweepDegrees)`：角度从正上方向顺时针计算，跨过零度也有效。例如 `.sectorLast(-30, 55)` 和 `.sectorLast(25, 45)` 分别是大小不同的两个按钮。未指定的角度自动留空，也可以用 `.gap(130, 40)` 明确保留空位。一个页面开始指定角度后，每个按钮都需要指定一次；按钮索引保持连续，空位不占按钮索引。未使用这些方法的页面仍默认均分。
+需要固定位置时，在每个按钮后追加 `.sectorLast(startDegrees, sweepDegrees)`：角度从正上方向顺时针计算，跨过零度也有效。例如 `.sectorLast(-30, 55)` 和 `.sectorLast(25, 45)` 分别是大小不同的两个按钮。未指定的角度自动留空，也可以用 `.gap(130, 40)` 明确保留空位。一个页面开始指定角度后，每个按钮都需要指定一次；按钮索引保持连续，空位不占按钮索引。默认按30°从12点钟顺排，只有真实动作有图标，不创建12个固定槽位。超过12项的旧菜单回退均分；新目录应分页。
 
-动态目录可以直接追加 `.squadLayout()`，自动生成不等大小的按钮扇区和两块空白区域，支持 1 到 64 个按钮。显式指定扇区时优先使用指定角度。Espetro 的指挥、建造、技能、职业和补给页面均已启用这一预设；载具页保持固定布局。
+新子页用 `.backSlot(() -> RadialMenuClientApi.back())` 添加返回图标，默认占9-12点钟。普通动作每项30°，只在末尾留空；10/11个动作时返回缩到剩余60°/30°。超过11个动作的分类应继续分目录。`.squadLayout()` 保留为兼容写法，使用新的默认时钟布局。显式扇区优先；载具页继续使用原固定布局。
+
+按钮上仅图标，悬停名称在中心，小号费用/说明在下方；不显示通用操作提示。`.tintLast(0xFFD5B25C)` 设置图标颜色，`.progressColorLast(color)` 单独指定持续动作进度颜色。
 
 真实游戏读条可由 `.progress(() -> new RadialMenuData.Progress("button_id", value, "#FFFF4A4A"))` 提供，`value` 必须是 0 到 1。未悬停这个按钮时画在内圈，悬停时移到对应外弧；中心上车等操作使用 `null` 作为按钮 ID。没有进行操作时只显示轨道，不伪造进度。库内持续操作的外弧直接使用会话的重复计时，不额外建立计时器。
 
@@ -83,7 +86,7 @@ RadialMenuClientApi.open(root,
 ./gradlew :forge:publishToMavenLocal
 ```
 
-运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.6。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.3.1`，本地接入先执行发布任务。
+运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.6。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.3.2`，本地接入先执行发布任务。
 
 库的服务端引导不加载客户端类，AUI 前置只在客户端要求。Espetro 服务端的权限及业务逻辑未迁移到库里。
 

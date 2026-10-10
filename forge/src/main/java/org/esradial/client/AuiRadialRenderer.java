@@ -28,7 +28,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
     private RadialMenuData menu;
     private RadialSession<RadialMenuData.Visual> session;
     private final Map<String, Element> nodes = new LinkedHashMap<>();
-    private Element root, slots, label, denial, center, breadcrumb, backButton;
+    private Element root, slots, label, denial, center, breadcrumb;
     private boolean backHovered;
     private int backingScale = 1;
     private double viewScale = 1;
@@ -78,10 +78,9 @@ public final class AuiRadialRenderer implements RadialRenderer {
         root = document.getElementById("radial"); slots = document.getElementById("slots");
         label = document.getElementById("label"); denial = document.getElementById("denial");
         center = document.getElementById("center-title"); breadcrumb = document.getElementById("breadcrumb");
-        backButton = document.getElementById("back-button");
         Element element = document.getElementById("ring");
         if (root == null || slots == null || label == null || denial == null || center == null
-            || breadcrumb == null || backButton == null || !(element instanceof Canvas)) return false;
+            || breadcrumb == null || !(element instanceof Canvas)) return false;
         canvas = (Canvas) element; generation = document.getRefreshGeneration();
         paintedRevision = -1; hovered = -2; width = height = -1; animation = progress = -1; nodes.clear();
         return true;
@@ -94,7 +93,8 @@ public final class AuiRadialRenderer implements RadialRenderer {
     }
     private double fitScale(RadialMenuData page) {
         Size size=document.getViewportSize();
-        return RadialViewSizing.scale(page.layout().outerRadius(),size.width(),size.height());
+        return editorHint == null ? RadialViewSizing.compactScale(page.layout().outerRadius(),size.width(),size.height())
+            : RadialViewSizing.scale(page.layout().outerRadius(),size.width(),size.height());
     }
     public Position guiToWheel(double x,double y) {
         Position p=document.guiToDocumentPosition(new Position(x,y)); Size size=document.getViewportSize();
@@ -105,10 +105,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
         return document.documentToGuiPosition(new Position(size.width()/2+x*scale,size.height()/2+y*scale));
     }
     public boolean isBackButtonHovered(RadialMenuData page, boolean back) {
-        return back && editorHint == null && document != null
-            && RadialBackButton.inside(page.layout().innerRadius()*fitScale(page))
-                .contains(document.getMouseDocumentPosition().x-document.getViewportSize().width()/2,
-                    document.getMouseDocumentPosition().y-document.getViewportSize().height()/2);
+        return false; // Returning is an ordinary annular action now.
     }
     public void update(RadialMenuData menu, RadialSession<RadialMenuData.Visual> session, double animation) {
         if (document == null || !document.isActive()) throw new IllegalStateException("AUI document is unavailable");
@@ -166,25 +163,13 @@ public final class AuiRadialRenderer implements RadialRenderer {
                 if (!source.isEmpty()) {
                     // Document.createElement creates a plain Element, even for registered tags.
                     // Instantiate the AUI texture renderer so the source is actually drawn.
-                    Element texture = new Texture(document); texture.setAttribute("src", source);
+                    Element texture = new RadialTexture(document,visual.textureTint()); texture.setAttribute("src", source);
                     node.appendChild(texture);
                 }
                 node.setAttribute("data-texture", source);
             }
-            Element caption = node.children.stream().filter(ch -> "caption".equals(ch.getAttribute("data-kind"))).findFirst().orElse(null);
-            if (caption == null) {
-                caption = document.createElement("div"); caption.setAttribute("data-kind", "caption");
-                caption.setAttribute("class", "radial-caption"); caption = node.appendChild(caption);
-            }
-            String name = visual.label().getString().replaceAll("§.", "").split("[（(]")[0].trim();
-            // The enemy directory and red icon already communicate affiliation.
-            caption.setAttribute("data-caption", name.replaceFirst("^敌方", ""));
-            Element directory = node.children.stream().filter(ch -> "directory".equals(ch.getAttribute("data-kind"))).findFirst().orElse(null);
-            if (directory == null) {
-                directory = document.createElement("div"); directory.setAttribute("data-kind", "directory");
-                directory.setAttribute("class", "radial-directory"); directory = node.appendChild(directory);
-            }
-            directory.setTextContent(slot.navigation() ? "›" : "");
+            for(var child:node.children) if(child instanceof RadialTexture texture) texture.setTint(visual.textureTint());
+
         }
         positionIcons(animation);
     }
@@ -193,25 +178,15 @@ public final class AuiRadialRenderer implements RadialRenderer {
         int count = session.page().slots().size();
         for (int i = 0; i < count; i++) {
             var slot = session.page().slots().get(i); Element node = nodes.get(slot.id());
-            var bounds=RadialCaptionBounds.forSlot(menu.layout(),i,count,animation);
             double x = width / 2 + menu.layout().slotX(i, count) * animation;
             double y = height / 2 + menu.layout().slotY(i, count) * animation;
-            if (editorHint == null) y += bounds.iconOffsetY();
             if (editorDragged >= 0 && menu.layout().sectors().get(editorDragged).slotIndex() == i) {
                 x = width / 2 + editorDragX*viewScale; y = height / 2 + editorDragY*viewScale;
             }
             node.setAttribute("style", "left:" + (x - 16) + "px;top:" + (y - 16) + "px;opacity:"
                     + animation * (slot.enabled() ? 1 : 0.35) + ";color:" + cssColor(slot.value().color()) + ";");
             node.setAttribute("class", "radial-slot" + (i == hovered ? " hovered" : "") + (!slot.enabled() ? " disabled" : ""));
-            Element caption = node.children.stream().filter(ch -> "caption".equals(ch.getAttribute("data-kind"))).findFirst().orElse(null);
-            if (caption != null) {
-                caption.setTextContent(fitText(caption.getAttribute("data-caption"), bounds.width(), 9, 600));
-                double logicalX = menu.layout().slotX(i, count) * animation;
-                double logicalY = menu.layout().slotY(i, count) * animation+bounds.iconOffsetY();
-                caption.setAttribute("style", "left:" + (bounds.left() - logicalX + 16) + "px;top:"
-                    + (bounds.top() - logicalY + 16) + "px;width:" + bounds.width()
-                    + "px;height:11px;display:" + (editorHint == null && bounds.width() > 0 ? "block" : "none") + ";");
-            }
+
         }
     }
     private static String fitText(String source, double width, double size, int weight) {
@@ -219,39 +194,35 @@ public final class AuiRadialRenderer implements RadialRenderer {
     }
     private void updateLabels() {
         var selected = session.hovered();
-        String footerLabel = editorHint == null ? selected == null ? menu.title().getString() : selected.value().label().getString()
-            : editorHint;
+        String raw = selected == null ? menu.title().getString() : selected.value().label().getString();
+        raw = raw.replaceAll("§.", "");
+        int split = raw.indexOf('(');
+        if (split < 0) split = raw.indexOf('（');
+        String name = split < 0 ? raw : raw.substring(0, split).trim();
+        String note = split < 0 ? "" : raw.substring(split).replaceAll("^[（(]|[）)]$", "").trim();
+        if (selected != null && !selected.enabled()) note = selected.value().denial().getString();
+        else if (selected != null && selected.repeatTicks() > 0 && note.isEmpty()) note = "按住左键操作";
+        double textWidth = Math.max(16, menu.layout().innerRadius() * viewScale * 2 - 14);
+        center.setTextContent("");
+        String left = "left:" + (width-textWidth)/2 + "px;width:" + textWidth + "px;margin:0;";
+        double nameSize=9*viewScale, noteSize=7*viewScale;
+        label.setTextContent(fitText(name, textWidth, nameSize, 600));
+        label.setAttribute("style", left + "top:" + (height/2-(note.isEmpty()?6:13)*viewScale) + "px;font-size:"+nameSize+"px;");
         denial.setAttribute("class", "radial-denial" + (selected != null && !selected.enabled() ? " unavailable" : ""));
-        denial.setTextContent(editorHint != null ? "Tab切换吸附 · 滚轮旋转 · Enter保存 · Esc取消 · R重置"
-            : inputHint != null ? (selected != null && !selected.enabled() ? selected.value().denial().getString() + " · " : "") + inputHint
-            : selected != null && !selected.enabled() ? selected.value().denial().getString() + " · F6编辑"
-            : selected != null && selected.repeatTicks() > 0 ? "按住左键操作 · Esc取消 · F6编辑"
-            : selected != null && selected.navigation() ? "左键进入分类 · 内圈返回 · Esc取消 · F6编辑"
-            : "左键选择 · 内圈返回 · Esc取消 · F6编辑");
-        double centerWidth=Math.min(76,menu.layout().innerRadius()*viewScale*2-14);
-        center.setTextContent(fitText(menu.title().getString(),centerWidth,10,600));
-        center.setAttribute("style", "left:" + ((width-centerWidth)/2) + "px;top:" + (height / 2 + (canBack && editorHint == null ? 5 : -5)) + "px;width:"+centerWidth+"px;");
+        denial.setTextContent(fitText(note,textWidth,noteSize,500));
+        denial.setAttribute("style", left + "top:" + (height/2+3*viewScale) + "px;font-size:"+noteSize+"px;");
         double pathWidth = Math.min(360,Math.max(0,width-16));
         breadcrumb.setTextContent(fitText(editorHint != null ? "布局编辑" : navigationPath,pathWidth,9,500));
         breadcrumb.setAttribute("style", "left:" + ((width-pathWidth)/2) + "px;top:"
-            + Math.max(0, height / 2 - menu.layout().outerRadius()*viewScale - 22) + "px;width:"+pathWidth+"px;");
-        var button = RadialBackButton.inside(menu.layout().innerRadius()*viewScale);
-        backButton.setAttribute("style", "left:" + (width / 2 + button.left()) + "px;top:" + (height / 2 + button.top())
-            + "px;width:" + button.width() + "px;height:" + button.height() + "px;background:"
-            + (backHovered ? "rgba(128,142,141,0.85)" : "rgba(33,45,47,0.88)")
-            + ";display:" + (canBack && editorHint == null ? "block" : "none") + ";");
-        document.getElementById("center-back").setAttribute("style", "left:" + (button.width()/2-17)
-            + "px;top:" + ((button.height()-9)/2) + "px;width:9px;height:9px;");
-        document.getElementById("back-label").setAttribute("style", "left:" + (button.width()/2-4)
-            + "px;top:" + ((button.height()-11)/2) + "px;width:22px;height:11px;");
-        double labelTop = menu.layout().outerRadius()*viewScale + 12;
-        // Keep all overlay positions in the same document coordinate space as the ring.
-        // AUI absolute positioning does not match browser negative-margin centering.
-        double textWidth = Math.min(editorHint == null ? 240 : 500, width - 16);
-        label.setTextContent(fitText(footerLabel, textWidth, 12, 600));
-        String labelLeft = "left:" + (width - textWidth) / 2 + "px;width:" + textWidth + "px;";
-        label.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop) + "px;margin:0;");
-        denial.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop + 26) + "px;margin:0;");
+            + Math.max(0,height/2-menu.layout().outerRadius()*viewScale-22) + "px;width:"+pathWidth+"px;");
+        if (editorHint != null) {
+            double footerWidth = Math.min(500,width-16);
+            String footerLeft = "left:"+(width-footerWidth)/2+"px;width:"+footerWidth+"px;";
+            label.setTextContent(fitText(editorHint,footerWidth,9,600));
+            label.setAttribute("style",footerLeft+"top:"+(height/2+menu.layout().outerRadius()*viewScale+12)+"px;font-size:9px;");
+            denial.setTextContent("Tab切换吸附 · 滚轮旋转 · Enter保存 · Esc取消 · R重置");
+            denial.setAttribute("style",footerLeft+"top:"+(height/2+menu.layout().outerRadius()*viewScale+32)+"px;font-size:8px;");
+        }
         root.setAttribute("style", "opacity:" + this.animation + ";");
     }
     private void drawRing(double animation) {
@@ -344,7 +315,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
             ctx.beginPath(); ctx.arc(c, c, Math.max(0, outer - 1), start, end); ctx.stroke();
             double value = progressOutside ? externalProgress.value() : progress;
             if (selected.enabled() && value > 0) {
-                ctx.setStrokeStyle(progressOutside ? cssColor(externalProgress.color()) : cssColor(selected.value().color()));
+                ctx.setStrokeStyle(progressOutside ? cssColor(externalProgress.color()) : cssColor(selected.value().highlight()));
                 ctx.setLineWidth(2.5);
                 ctx.beginPath(); ctx.arc(c, c, Math.max(0, outer - 1), start, start + (end - start) * value); ctx.stroke();
             }
@@ -372,7 +343,6 @@ public final class AuiRadialRenderer implements RadialRenderer {
             var slot = session.page().slots().get(i); var v = slot.value();
             if (v.item().isEmpty() && v.nativeIcon() == null) continue;
             double x = menu.layout().slotX(i, count) * animation*viewScale, y = menu.layout().slotY(i, count) * animation*viewScale;
-            if (editorHint == null) y += RadialCaptionBounds.forSlot(menu.layout(),i,count,animation*viewScale).iconOffsetY();
             if (editorDragged >= 0 && menu.layout().sectors().get(editorDragged).slotIndex() == i) {
                 x = editorDragX*viewScale; y = editorDragY*viewScale;
             }

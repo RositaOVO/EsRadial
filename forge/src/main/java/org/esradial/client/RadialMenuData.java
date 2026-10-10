@@ -25,7 +25,11 @@ public record RadialMenuData(ResourceLocation id, Component title, RadialLayout 
         this(id, title, layout, slots, ringColors, animationSpeed, () -> Progress.NONE);
     }
     public record Visual(Component label, ResourceLocation texture, ItemStack item,
-                         IRadialIcon nativeIcon, String color, String highlight, Component denial) {
+                         IRadialIcon nativeIcon, String color, String highlight, Component denial, int textureTint) {
+        public Visual(Component label, ResourceLocation texture, ItemStack item, IRadialIcon nativeIcon,
+                String color, String highlight, Component denial) {
+            this(label,texture,item,nativeIcon,color,highlight,denial,0xFFFFFFFF);
+        }
         public Visual {
             Objects.requireNonNull(label); item = item == null ? ItemStack.EMPTY : item.copy();
             Objects.requireNonNull(color); Objects.requireNonNull(highlight); Objects.requireNonNull(denial);

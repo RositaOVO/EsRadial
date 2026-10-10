@@ -46,12 +46,17 @@ public final class RadialMenuClientApi {
         MinecraftForge.EVENT_BUS.addListener(RadialMenuClientApi::tick);
         MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, true, RadialMenuClientApi::onMouse);
         MinecraftForge.EVENT_BUS.addListener(RadialMenuClientApi::onKey);
+        MinecraftForge.EVENT_BUS.addListener(RadialMenuClientApi::hideCrosshair);
         MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, RadialMenuClientApi::render);
     }
     public static void setRendererFactory(Supplier<RadialRenderer> factory) {
         requireClientThread();
         if (isActive()) throw new IllegalStateException("Close the current wheel before changing renderer");
         rendererFactory = Objects.requireNonNull(factory);
+    }
+    private static void hideCrosshair(net.minecraftforge.client.event.RenderGuiOverlayEvent.Pre event) {
+        if (session != null && event.getOverlay().id().equals(net.minecraftforge.client.gui.overlay.VanillaGuiOverlay.CROSSHAIR.id()))
+            event.setCanceled(true);
     }
     public static boolean open(ResourceLocation id) {
         RadialMenuData data = RadialMenuRegistry.getRuntimeMenu(id);
