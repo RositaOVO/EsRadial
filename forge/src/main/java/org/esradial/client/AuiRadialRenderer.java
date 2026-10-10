@@ -11,6 +11,7 @@ import com.sighs.apricityui.layout.Size;
 import com.sighs.apricityui.render.Base;
 import net.minecraft.client.gui.GuiGraphics;
 import org.esradial.core.RadialSession;
+import org.esradial.core.RadialBackButton;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,7 +25,8 @@ public final class AuiRadialRenderer implements RadialRenderer {
     private RadialMenuData menu;
     private RadialSession<RadialMenuData.Visual> session;
     private final Map<String, Element> nodes = new LinkedHashMap<>();
-    private Element root, slots, label, denial, center, breadcrumb, backIcon;
+    private Element root, slots, label, denial, center, breadcrumb, backButton;
+    private boolean backHovered;
     private String navigationPath = "";
     private boolean canBack;
     private String inputHint;
@@ -71,10 +73,10 @@ public final class AuiRadialRenderer implements RadialRenderer {
         root = document.getElementById("radial"); slots = document.getElementById("slots");
         label = document.getElementById("label"); denial = document.getElementById("denial");
         center = document.getElementById("center-title"); breadcrumb = document.getElementById("breadcrumb");
-        backIcon = document.getElementById("center-back");
+        backButton = document.getElementById("back-button");
         Element element = document.getElementById("ring");
         if (root == null || slots == null || label == null || denial == null || center == null
-            || breadcrumb == null || backIcon == null || !(element instanceof Canvas)) return false;
+            || breadcrumb == null || backButton == null || !(element instanceof Canvas)) return false;
         canvas = (Canvas) element; generation = document.getRefreshGeneration();
         paintedRevision = -1; hovered = -2; width = height = -1; animation = progress = -1; nodes.clear();
         return true;
@@ -85,13 +87,20 @@ public final class AuiRadialRenderer implements RadialRenderer {
     public double mouseY() {
         Position p = document.getMouseDocumentPosition(); return p.y - document.getViewportSize().height() / 2;
     }
+    public boolean isBackButtonHovered(RadialMenuData page, boolean back) {
+        return back && editorHint == null && document != null
+            && RadialBackButton.above(page.layout().outerRadius(), document.getViewportSize().height())
+                .contains(mouseX(), mouseY());
+    }
     public void update(RadialMenuData menu, RadialSession<RadialMenuData.Visual> session, double animation) {
         if (document == null || !document.isActive()) throw new IllegalStateException("AUI document is unavailable");
         if (generation != document.getRefreshGeneration() && !bind()) throw new IllegalStateException("Invalid radial template after reload");
         this.menu = menu; this.session = session;
         Size size = document.getViewportSize();
         boolean resized = width != size.width() || height != size.height();
-        boolean changed = resized || paintedRevision != session.revision() || editorChanged;
+        boolean nextBackHovered = isBackButtonHovered(menu, canBack);
+        boolean changed = resized || paintedRevision != session.revision() || editorChanged || backHovered != nextBackHovered;
+        backHovered = nextBackHovered;
         editorChanged = false;
         if (changed) {
             width = size.width(); height = size.height();
@@ -174,16 +183,19 @@ public final class AuiRadialRenderer implements RadialRenderer {
         denial.setTextContent(editorHint != null ? "Tab切换吸附 · 滚轮旋转 · Enter保存 · Esc取消 · R重置"
             : inputHint != null ? (selected != null && !selected.enabled() ? selected.value().denial().getString() + " · " : "") + inputHint
             : selected != null && !selected.enabled() ? selected.value().denial().getString() + " · F6编辑"
-            : selected != null && selected.repeatTicks() > 0 ? "按住左键操作 · 右键返回 · F6编辑"
-            : selected != null && selected.navigation() ? "左键进入分类 · 右键返回 · F6编辑"
-            : "左键选择 · 右键返回 · F6编辑");
+            : selected != null && selected.repeatTicks() > 0 ? "按住左键操作 · Esc取消 · F6编辑"
+            : selected != null && selected.navigation() ? "左键进入分类 · 上方返回 · Esc取消 · F6编辑"
+            : "左键选择 · 上方返回 · Esc取消 · F6编辑");
         center.setTextContent(menu.title().getString());
-        center.setAttribute("style", "left:" + (width / 2 - 38) + "px;top:" + (height / 2 - (canBack ? 19 : 5)) + "px;width:76px;");
+        center.setAttribute("style", "left:" + (width / 2 - 38) + "px;top:" + (height / 2 - 5) + "px;width:76px;");
         breadcrumb.setTextContent(editorHint != null ? "布局编辑" : navigationPath);
         breadcrumb.setAttribute("style", "left:" + (width / 2 - 180) + "px;top:"
-            + (height / 2 - menu.layout().outerRadius() - 22) + "px;width:360px;");
-        backIcon.setAttribute("style", "left:" + (width / 2 - 10) + "px;top:" + (height / 2 + 3)
-            + "px;width:20px;height:20px;display:" + (canBack && editorHint == null ? "block" : "none") + ";");
+            + Math.max(0, height / 2 - menu.layout().outerRadius() - (canBack ? 42 : 22)) + "px;width:360px;");
+        var button = RadialBackButton.above(menu.layout().outerRadius(), height);
+        backButton.setAttribute("style", "left:" + (width / 2 + button.left()) + "px;top:" + (height / 2 + button.top())
+            + "px;width:" + button.width() + "px;height:" + button.height() + "px;background:"
+            + (backHovered ? "rgba(128,142,141,0.85)" : "rgba(33,45,47,0.88)")
+            + ";display:" + (canBack && editorHint == null ? "block" : "none") + ";");
         double labelTop = menu.layout().outerRadius() + 16;
         // Keep all overlay positions in the same document coordinate space as the ring.
         // AUI absolute positioning does not match browser negative-margin centering.

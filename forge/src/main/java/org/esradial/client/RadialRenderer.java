@@ -10,6 +10,7 @@ public interface RadialRenderer {
     double mouseX();
     double mouseY();
     default void setNavigation(String breadcrumb, boolean canBack) { }
+    default boolean isBackButtonHovered(RadialMenuData menu, boolean canBack) { return false; }
     void render(GuiGraphics graphics);
     void close();
 }

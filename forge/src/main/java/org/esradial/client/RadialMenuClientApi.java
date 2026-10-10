@@ -159,7 +159,12 @@ public final class RadialMenuClientApi {
             session.close(RadialSession.CloseReason.ERROR); finishClose();
         }
     }
-    private static void updateHover() { if (session != null && !closing) session.hover(renderer.mouseX(), renderer.mouseY()); }
+    private static void updateHover() {
+        if (session != null && !closing) {
+            if (renderer.isBackButtonHovered(menu, !history.isEmpty())) session.hover(0, 0);
+            else session.hover(renderer.mouseX(), renderer.mouseY());
+        }
+    }
     private static boolean releaseOpeningKey() {
         if (options.heldKey() == null || options.heldKey().getAsBoolean()) return false;
         if (options.confirmOnRelease()) session.confirmRelease(); else session.close(RadialSession.CloseReason.RELEASE);
@@ -170,13 +175,10 @@ public final class RadialMenuClientApi {
         event.setCanceled(true);
         if (closing) return;
         if (releaseOpeningKey()) return;
-        if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_RIGHT && event.getAction() == GLFW.GLFW_PRESS) {
-            if (!back()) close();
-        }
         if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             try {
                 updateHover();
-                if (event.getAction() == GLFW.GLFW_PRESS && isCenterHovered() && !history.isEmpty()) {
+                if (event.getAction() == GLFW.GLFW_PRESS && renderer.isBackButtonHovered(menu, !history.isEmpty())) {
                     back(); session.seedPrimary(true); return;
                 }
                 session.updatePrimary(event.getAction() == GLFW.GLFW_PRESS);

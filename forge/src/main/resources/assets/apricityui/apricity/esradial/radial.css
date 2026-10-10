@@ -10,7 +10,9 @@ html, body { margin: 0; width: 100%; height: 100%; background: transparent; poin
     color: #aeb7ba; font-size: 10px; text-align: center; pointer-events: none; }
 .radial-denial.unavailable { color: #ff7777; }
 .radial-center { position: absolute; text-align: center; color: #f1f2ed; font-size: 10px; pointer-events: none; }
-#center-back { position: absolute; pointer-events: none; }
+#back-button { position: absolute; display: none; border: 1px solid #8fa9a5; pointer-events: none; }
+#center-back { position: absolute; left: 9px; top: 4px; width: 12px; height: 12px; pointer-events: none; }
+#back-label { position: absolute; left: 25px; top: 5px; width: 42px; font-size: 10px; color: #f1f2ed; pointer-events: none; }
 .radial-breadcrumb { position: absolute; text-align: center; color: #d5b25c; font-size: 9px; pointer-events: none; }
 .radial-caption { position: absolute; left: -20px; top: 29px; width: 72px; color: #ededdf; font-size: 8px; text-align: center; pointer-events: none; }
 .radial-directory { position: absolute; left: 27px; top: 5px; width: 10px; color: #d5b25c; font-size: 12px; pointer-events: none; }

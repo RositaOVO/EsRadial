@@ -9,7 +9,7 @@
 - 按住调用模组的轮盘键打开；向图标所在方向移动鼠标即可选中，移到圆环外也有效。
 - 左键点击执行；点击菜单入口进入子菜单，保持同一个 Overlay，不会关了再闪一下。
 - 松开打开键只关闭轮盘，不执行选项。库也支持由方块右键打开的普通点击模式。
-- 右键返回上一级；根页面右键关闭。Esc、死亡、断线、打开其他 Screen、失去窗口焦点也会结束会话。
+- 点击轮盘上方的返回按钮回到上一级；右键不执行导航。Esc、死亡、断线、打开其他 Screen、失去窗口焦点也会结束会话。
 - 中心是安全区，不选中外围选项。Espetro 的载具中心额外由原有上车系统提供左键读条。
 - 持续操作选项支持按住左键重复执行；松开左键、移到中心或不可用项目就停止。
 - 外侧线仅在悬停时显示所选外弧。进度默认贴着内侧圆圈，悬停到对应动作时显示在外弧。
@@ -68,9 +68,9 @@ RadialMenuClientApi.open(root,
 
 默认资源逻辑路径是 `esradial/radial.html`。资源放在 `assets/apricityui/apricity/esradial/`，兼容 AUI 1.2.6 的 classpath 资源回退路径。
 
-可在游戏目录的 `apricity/esradial/` 用同名 HTML/CSS 覆盖默认外观。保留 `radial`、`ring`（canvas）、`slots`、`label`、`denial`、`center-title`、`breadcrumb`、`center-back` 的 DOM ID 和页面 meta。改变颜色、字体、边距不需要改 Espetro 的网络代码。
+可在游戏目录的 `apricity/esradial/` 用同名 HTML/CSS 覆盖默认外观。保留 `radial`、`ring`（canvas）、`slots`、`label`、`denial`、`center-title`、`breadcrumb`、`back-button`、`center-back`、`back-label` 的 DOM ID 和页面 meta。改变颜色、字体、边距不需要改 Espetro 的网络代码。
 
-大幅改布局时，客户端可调用 `setRendererFactory(() -> new AuiRadialRenderer("mymod/custom.html"))`，或实现 `RadialRenderer`。命中检测与绘制必须使用同一逻辑坐标系。
+大幅改布局时，客户端可调用 `setRendererFactory(() -> new AuiRadialRenderer("mymod/custom.html"))`，或实现 `RadialRenderer`。命中检测与绘制必须使用同一逻辑坐标系。自定义渲染器应实现 `isBackButtonHovered(menu, canBack)`，默认 AUI 模板使用 `RadialBackButton.above` 共享返回按钮的绘制与命中区域。
 
 ## 构建
 
@@ -80,7 +80,7 @@ RadialMenuClientApi.open(root,
 ./gradlew :forge:publishToMavenLocal
 ```
 
-运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.6。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.3.0`，本地接入先执行发布任务。
+运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.6。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.3.1`，本地接入先执行发布任务。
 
 库的服务端引导不加载客户端类，AUI 前置只在客户端要求。Espetro 服务端的权限及业务逻辑未迁移到库里。
 

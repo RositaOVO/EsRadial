@@ -1,6 +1,6 @@
 # 玩家轮盘布局
 
-需要 EsRadial **0.3.0**。Espetro、EsPoints 及其他使用 EsRadial 的菜单都会自动读取客户端布局。
+需要 EsRadial **0.3.1**。Espetro、EsPoints 及其他使用 EsRadial 的菜单都会自动读取客户端布局。
 
 ## 游戏内拖动
 
