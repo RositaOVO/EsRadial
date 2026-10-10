@@ -12,6 +12,7 @@ import com.sighs.apricityui.render.Base;
 import net.minecraft.client.gui.GuiGraphics;
 import org.esradial.core.RadialSession;
 import org.esradial.core.RadialBackButton;
+import org.esradial.core.RadialCanvasResolution;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -27,6 +28,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
     private final Map<String, Element> nodes = new LinkedHashMap<>();
     private Element root, slots, label, denial, center, breadcrumb, backButton;
     private boolean backHovered;
+    private int backingScale = 1;
     private String navigationPath = "";
     private boolean canBack;
     private String inputHint;
@@ -97,10 +99,17 @@ public final class AuiRadialRenderer implements RadialRenderer {
         if (generation != document.getRefreshGeneration() && !bind()) throw new IllegalStateException("Invalid radial template after reload");
         this.menu = menu; this.session = session;
         Size size = document.getViewportSize();
+        var window = net.minecraft.client.Minecraft.getInstance().getWindow();
+        Position unit = document.documentToGuiPosition(new Position(1, 0));
+        Position zero = document.documentToGuiPosition(new Position(0, 0));
+        int nextBackingScale = RadialCanvasResolution.scale((int) Math.ceil(menu.layout().outerRadius() * 2 + 8),
+            unit.x - zero.x, window.getWidth(), window.getGuiScaledWidth());
         boolean resized = width != size.width() || height != size.height();
         boolean nextBackHovered = isBackButtonHovered(menu, canBack);
-        boolean changed = resized || paintedRevision != session.revision() || editorChanged || backHovered != nextBackHovered;
+        boolean changed = resized || paintedRevision != session.revision() || editorChanged
+            || backHovered != nextBackHovered || backingScale != nextBackingScale;
         backHovered = nextBackHovered;
+        backingScale = nextBackingScale;
         editorChanged = false;
         if (changed) {
             width = size.width(); height = size.height();
@@ -207,14 +216,18 @@ public final class AuiRadialRenderer implements RadialRenderer {
     }
     private void drawRing(double animation) {
         int extent = (int) Math.ceil(menu.layout().outerRadius() * 2 + 8);
-        if (canvas.getWidth() != extent) canvas.setWidth(extent);
-        if (canvas.getHeight() != extent) canvas.setHeight(extent);
+        int pixels = extent * backingScale;
+        if (canvas.getWidth() != pixels) canvas.setWidth(pixels);
+        if (canvas.getHeight() != pixels) canvas.setHeight(pixels);
         canvas.setAttribute("style", "width:" + extent + "px;height:" + extent + "px;left:"
                 + (width - extent) / 2 + "px;top:" + (height - extent) / 2 + "px;");
         CanvasRenderingContext2D ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, extent, extent);
+        // AUI's CSS extent stays logical; its canvas now has native-resolution pixels.
+        // Reset every repaint so animation/reload never accumulates the transform.
+        ctx.resetTransform(); ctx.clearRect(0, 0, pixels, pixels);
+        ctx.setTransform(backingScale, 0, 0, backingScale, 0, 0);
         double c = extent / 2.0, inner = menu.layout().innerRadius() * animation, outer = menu.layout().outerRadius() * animation;
-        if (outer < 1) return;
+        if (outer < 1) { ctx.resetTransform(); return; }
         var gradient = ctx.createRadialGradient(c, c, inner, c, c, outer);
         for (int i = 0; i < menu.ringColors().size(); i++)
             gradient.addColorStop(menu.ringColors().size() == 1 ? 0 : i / (double) (menu.ringColors().size() - 1), cssColor(menu.ringColors().get(i)));
