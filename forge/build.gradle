@@ -25,7 +25,7 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:1.20.1-${providers.gradleProperty('forgeVersion').orElse('47.4.22').get()}"
     api project(':core')
-    implementation fg.deobf('com.sighs:ApricityUI-forge-1.20.1:1.2.3.1')
+    implementation fg.deobf('com.sighs:ApricityUI-forge-1.20.1:1.2.6')
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
 }
 test { useJUnitPlatform() }

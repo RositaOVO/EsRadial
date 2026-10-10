@@ -1,6 +1,6 @@
 # EsRadial
 
-用 ApricityUI 实现的通用 Minecraft 轮盘库。当前支持 Forge 1.20.1、Java 17、ApricityUI 1.2.3.1。
+用 ApricityUI 实现的通用 Minecraft 轮盘库。当前支持 Forge 1.20.1、Java 17、ApricityUI 1.2.6。
 
 默认外观参考 Squad：半透明深灰圆环、分隔线、简单图标、浅灰选中区域和轮盘下方的文字。使用用户提供的 UI.zip 目录和工事图标，没有 AuraTip 依赖。
 
@@ -66,7 +66,7 @@ RadialMenuClientApi.open(root,
 
 ## 以后换 UI
 
-默认资源逻辑路径是 `esradial/radial.html`。资源放在 `assets/apricityui/apricity/esradial/`，兼容 AUI 1.2.3.1 的 classpath 资源回退路径。
+默认资源逻辑路径是 `esradial/radial.html`。资源放在 `assets/apricityui/apricity/esradial/`，兼容 AUI 1.2.6 的 classpath 资源回退路径。
 
 可在游戏目录的 `apricity/esradial/` 用同名 HTML/CSS 覆盖默认外观。保留 `radial`、`ring`（canvas）、`slots`、`label`、`denial`、`center-title`、`breadcrumb`、`center-back` 的 DOM ID 和页面 meta。改变颜色、字体、边距不需要改 Espetro 的网络代码。
 
@@ -80,12 +80,14 @@ RadialMenuClientApi.open(root,
 ./gradlew :forge:publishToMavenLocal
 ```
 
-运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.3.1。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.3.0`，本地接入先执行发布任务。
+运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.6。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.3.0`，本地接入先执行发布任务。
 
 库的服务端引导不加载客户端类，AUI 前置只在客户端要求。Espetro 服务端的权限及业务逻辑未迁移到库里。
 
 ## 验证状态
 
-39 项核心及配置测试已通过，包括角度命中、不等大小及跨零度扇区、空白区域停止重复、全部目录尺寸、快速点击、不可用项、松键取消、导航、重复计时、拖动空槽、调整分界、旋转、稳定 ID 配置重读、独立 profile 和坏文件保护。Forge/AUI Java 源码已用真实 Forge 映射 jar 和 AUI 1.2.3.1 编译验证。独立 Minecraft 客户端已验证编辑预览、拖动按钮和空槽、分界调整、保存后重新打开、取消不保存、手动配置重读及恢复默认；编辑动作不会调用业务回调。
+39项核心与布局配置测试通过，包含30°/45°倍数吸附、跨0°边界、空槽、分类点击及松键取消。Forge/AUI源码已使用Java17、真实Forge映射和ApricityUI1.2.6编译。
 
-Espetro 1.20.1 的历史基线 32d67bb 接入后，完整源码 Java 编译及 13 项适配测试已通过。测试 jar 已完成 Mixin 注解处理和 Forge 名称重映射，基础联机轮盘操作已在本机测试。独立验证客户端已在实际 Minecraft 中确认建造和载具图标、悬停高亮及空白扇区显示；修复了 AUI 插入 DIV 时转换对象、旧引用导致图标脱离真实 DOM 的问题。最新 427dbbd 缺少部分既有数据包类，未通过完整编译。本机 ForgeGradle 仍有依赖元数据解析问题，测试包通过 Java 17 和 Forge 映射工具构建。目录数据、业务权限及所有游戏内场景仍需要调用模组的完整验收。
+实际Minecraft联机客户端验证了目录下钻、图标、松键取消、编辑拖动、保存/取消、配置重读与恢复默认；地图嵌入轮盘验证打开、Esc退出及父界面关闭后清理Document。EsPoints另有15项相关测试、Espetro15项适配/权限分类测试通过。
+
+Espetro试玩包使用历史完整基线32d67bb接入本次控制器与载具快照API；PR基于最新1.20.1代码。最新4ae5012仍缺FixedWeaponWheelPacket源码和DragonRise依赖，完整编译未通过。试玩包不能等同于最新分支正式发行包。本机ForgeGradle依赖元数据解析仍有限制，测试包使用Java17、Mixin注解处理与Forge名称映射构建。
