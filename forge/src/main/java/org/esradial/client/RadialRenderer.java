@@ -9,6 +9,7 @@ public interface RadialRenderer {
     void update(RadialMenuData menu, RadialSession<RadialMenuData.Visual> session, double animation);
     double mouseX();
     double mouseY();
+    default void setNavigation(String breadcrumb, boolean canBack) { }
     void render(GuiGraphics graphics);
     void close();
 }

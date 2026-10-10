@@ -25,6 +25,22 @@ public record RadialLayout(double innerRadius, double outerRadius, List<RadialLa
     public static RadialLayout squad(double innerRadius, double outerRadius, int count) {
         if (count < 0 || count > 64) throw new IllegalArgumentException("Invalid slot count");
         if (count == 0) return new RadialLayout(innerRadius, outerRadius);
+        if (count <= 9) {
+            double[][] widths = {{}, {180}, {120, 150}, {120, 90, 90}, {60, 90, 90, 60},
+                {60, 60, 90, 60, 30}, {60, 60, 60, 60, 30, 30},
+                {60, 60, 60, 30, 30, 30, 30}, {60, 60, 30, 30, 30, 30, 30, 30},
+                {60, 30, 30, 30, 30, 30, 30, 30, 30}};
+            double[] gaps = count == 1 ? new double[]{90, 90} : count == 2
+                ? new double[]{30, 60} : new double[]{30, 30};
+            List<Sector> areas = new ArrayList<>();
+            double angle = count == 1 ? 270 : count <= 3 ? 300 : 330;
+            for (int i = 0; i < count; i++) {
+                areas.add(new Sector(angle, widths[count][i], i)); angle += widths[count][i];
+                if (i == (count - 1) / 2) { areas.add(new Sector(angle, gaps[0], -1)); angle += gaps[0]; }
+            }
+            areas.add(new Sector(angle, gaps[1], -1));
+            return new RadialLayout(innerRadius, outerRadius, areas);
+        }
         double[] weights = {55, 45, 60, 35, 55, 35};
         double total = 75;
         for (int i = 0; i < count; i++) total += weights[i % weights.length];

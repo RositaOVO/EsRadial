@@ -12,7 +12,7 @@ public final class RadialLayouts {
     private static final RadialLayoutStore STORE = new RadialLayoutStore(FMLPaths.CONFIGDIR.get().resolve("esradial/layouts.json"));
     private RadialLayouts() { }
     static List<String> ids(RadialMenuData menu) { return menu.slots().stream().map(RadialSession.Slot::id).toList(); }
-    static RadialMenuData apply(RadialMenuData menu) {
+    public static RadialMenuData apply(RadialMenuData menu) {
         try { return withLayout(menu, STORE.load(menu.id().toString(), menu.layout(), ids(menu))); }
         catch (IOException error) {
             LogUtils.getLogger().warn("EsRadial: using default layout for {}: {}", menu.id(), error.getMessage());

@@ -9,7 +9,11 @@ import java.util.function.Consumer;
 /** UI-independent session. All methods are called by one owning thread. */
 public final class RadialSession<T> {
     public record Slot<T>(String id, T value, boolean enabled, boolean closeAfterAction,
-                          int repeatTicks, Runnable action) {
+                          int repeatTicks, Runnable action, boolean navigation) {
+        public Slot(String id, T value, boolean enabled, boolean closeAfterAction,
+                    int repeatTicks, Runnable action) {
+            this(id, value, enabled, closeAfterAction, repeatTicks, action, false);
+        }
         public Slot {
             if (id == null || id.isBlank()) throw new IllegalArgumentException("Empty slot id");
             Objects.requireNonNull(value); Objects.requireNonNull(action);
@@ -96,7 +100,7 @@ public final class RadialSession<T> {
     public boolean confirm(boolean fromRelease) {
         Slot<T> slot = hovered();
         if (closed || executing || slot == null || !slot.enabled()) return false;
-        if (fromRelease && slot.repeatTicks() > 0) return false;
+        if (fromRelease && (slot.repeatTicks() > 0 || slot.navigation())) return false;
         long before = revision;
         executing = true;
         try { slot.action().run(); }

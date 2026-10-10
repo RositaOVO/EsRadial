@@ -2,7 +2,7 @@
 
 用 ApricityUI 实现的通用 Minecraft 轮盘库。当前支持 Forge 1.20.1、Java 17、ApricityUI 1.2.3.1。
 
-默认外观参考 Squad：半透明深灰圆环、分隔线、简单图标、浅灰选中区域和轮盘下方的文字。没有打包 Squad 的图片、字体或音效，也没有 AuraTip 依赖。
+默认外观参考 Squad：半透明深灰圆环、分隔线、简单图标、浅灰选中区域和轮盘下方的文字。使用用户提供的 UI.zip 目录和工事图标，没有 AuraTip 依赖。
 
 ## 玩家操作
 
@@ -12,17 +12,20 @@
 - 右键返回上一级；根页面右键关闭。Esc、死亡、断线、打开其他 Screen、失去窗口焦点也会结束会话。
 - 中心是安全区，不选中外围选项。Espetro 的载具中心额外由原有上车系统提供左键读条。
 - 持续操作选项支持按住左键重复执行；松开左键、移到中心或不可用项目就停止。
-- 外侧轮廓常亮，悬停时所选外弧常亮。进度默认贴着内侧圆圈，悬停到对应动作时显示在外弧。
+- 外侧线仅在悬停时显示所选外弧。进度默认贴着内侧圆圈，悬停到对应动作时显示在外弧。
 - 扇区可以大小不同并保留空白；空白区域不会选中、执行或继续重复操作。
 - 不可用项变淡，显示原因，不执行回调。费用、人数、余额等由调用模组提供。
 
 ## 自己调整轮盘
 
 打开轮盘后按 **F6**，拖动图标所在扇区或空槽调整位置，拖动黄色分界点所在的线调整大小，滚轮旋转整个轮盘。
+**Tab** 切换 30°/45°、30°、45°、自由吸附；默认吸附到最近的 30°或45°倍数。
 **Enter** 保存，**Esc** 取消，**R** 恢复默认（再按 Enter 保存）。编辑时松开打开键不会确认动作。
 配置文件为客户端 `config/esradial/layouts.json`，修改后下次打开轮盘生效。
 每个菜单和不同选项集合分别保存，布局按稳定按钮 ID 匹配，服务端规则不变。
 详见 [布局配置与拖动操作](docs/LAYOUTS.md)。
+
+共享指挥入口、分类目录和吸附说明见 [分类轮盘](docs/SQUAD-TREE.md)。
 
 ## 模组作者怎么接
 
@@ -39,7 +42,7 @@ var build = new RadialMenuBuilder(new ResourceLocation("mymod", "build"))
 var root = new RadialMenuBuilder(new ResourceLocation("mymod", "root"))
     .title(Component.literal("指挥菜单"))
     .slot("build", new ResourceLocation("mymod", "textures/gui/build.png"),
-        () -> RadialMenuClientApi.navigate(build), Component.literal("建造"), "#FFFFFFFF")
+        () -> RadialMenuClientApi.navigate(build), Component.literal("建造"), "#FFFFFFFF").submenuLast()
     .build();
 RadialMenuClientApi.open(root,
     RadialMenuClientApi.OpenOptions.hold("mymod", () -> wheelKey.isDown()));
@@ -65,7 +68,7 @@ RadialMenuClientApi.open(root,
 
 默认资源逻辑路径是 `esradial/radial.html`。资源放在 `assets/apricityui/apricity/esradial/`，兼容 AUI 1.2.3.1 的 classpath 资源回退路径。
 
-可在游戏目录的 `apricity/esradial/` 用同名 HTML/CSS 覆盖默认外观。保留 `radial`、`ring`（canvas）、`slots`、`label`、`denial` 的 DOM ID 和页面 meta。改变颜色、字体、边距不需要改 Espetro 的网络代码。
+可在游戏目录的 `apricity/esradial/` 用同名 HTML/CSS 覆盖默认外观。保留 `radial`、`ring`（canvas）、`slots`、`label`、`denial`、`center-title`、`breadcrumb`、`center-back` 的 DOM ID 和页面 meta。改变颜色、字体、边距不需要改 Espetro 的网络代码。
 
 大幅改布局时，客户端可调用 `setRendererFactory(() -> new AuiRadialRenderer("mymod/custom.html"))`，或实现 `RadialRenderer`。命中检测与绘制必须使用同一逻辑坐标系。
 
@@ -77,12 +80,12 @@ RadialMenuClientApi.open(root,
 ./gradlew :forge:publishToMavenLocal
 ```
 
-运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.3.1。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.2.0`，本地接入先执行发布任务。
+运行 jar 在 `forge/build/libs/`。最终 Forge jar 已包含 core；安装时只需它与 ApricityUI 1.2.3.1。开发依赖坐标为 `org.esradial:esradial-forge-1.20.1:0.3.0`，本地接入先执行发布任务。
 
 库的服务端引导不加载客户端类，AUI 前置只在客户端要求。Espetro 服务端的权限及业务逻辑未迁移到库里。
 
 ## 验证状态
 
-33 项核心及配置测试已通过，包括角度命中、不等大小及跨零度扇区、空白区域停止重复、全部目录尺寸、快速点击、不可用项、松键取消、导航、重复计时、拖动空槽、调整分界、旋转、稳定 ID 配置重读、独立 profile 和坏文件保护。Forge/AUI Java 源码已用真实 Forge 映射 jar 和 AUI 1.2.3.1 编译验证。独立 Minecraft 客户端已验证编辑预览、拖动按钮和空槽、分界调整、保存后重新打开、取消不保存、手动配置重读及恢复默认；编辑动作不会调用业务回调。
+39 项核心及配置测试已通过，包括角度命中、不等大小及跨零度扇区、空白区域停止重复、全部目录尺寸、快速点击、不可用项、松键取消、导航、重复计时、拖动空槽、调整分界、旋转、稳定 ID 配置重读、独立 profile 和坏文件保护。Forge/AUI Java 源码已用真实 Forge 映射 jar 和 AUI 1.2.3.1 编译验证。独立 Minecraft 客户端已验证编辑预览、拖动按钮和空槽、分界调整、保存后重新打开、取消不保存、手动配置重读及恢复默认；编辑动作不会调用业务回调。
 
-Espetro 1.20.1 的历史基线 32d67bb 接入后，完整源码 Java 编译及 11 项适配测试已通过。测试 jar 已完成 Mixin 注解处理和 Forge 名称重映射，基础联机轮盘操作已在本机测试。独立验证客户端已在实际 Minecraft 中确认建造和载具图标、悬停高亮及空白扇区显示；修复了 AUI 插入 DIV 时转换对象、旧引用导致图标脱离真实 DOM 的问题。最新 427dbbd 缺少部分既有数据包类，未通过完整编译。本机 ForgeGradle 仍有依赖元数据解析问题，测试包通过 Java 17 和 Forge 映射工具构建。目录数据、业务权限及所有游戏内场景仍需要调用模组的完整验收。
+Espetro 1.20.1 的历史基线 32d67bb 接入后，完整源码 Java 编译及 13 项适配测试已通过。测试 jar 已完成 Mixin 注解处理和 Forge 名称重映射，基础联机轮盘操作已在本机测试。独立验证客户端已在实际 Minecraft 中确认建造和载具图标、悬停高亮及空白扇区显示；修复了 AUI 插入 DIV 时转换对象、旧引用导致图标脱离真实 DOM 的问题。最新 427dbbd 缺少部分既有数据包类，未通过完整编译。本机 ForgeGradle 仍有依赖元数据解析问题，测试包通过 Java 17 和 Forge 映射工具构建。目录数据、业务权限及所有游戏内场景仍需要调用模组的完整验收。

@@ -24,7 +24,18 @@ public final class AuiRadialRenderer implements RadialRenderer {
     private RadialMenuData menu;
     private RadialSession<RadialMenuData.Visual> session;
     private final Map<String, Element> nodes = new LinkedHashMap<>();
-    private Element root, slots, label, denial;
+    private Element root, slots, label, denial, center, breadcrumb, backIcon;
+    private String navigationPath = "";
+    private boolean canBack;
+    private String inputHint;
+    public void setInputHint(String hint) {
+        if (!Objects.equals(inputHint, hint)) editorChanged = true;
+        inputHint = hint;
+    }
+    public void setNavigation(String path, boolean back) {
+        if (!Objects.equals(path, navigationPath) || canBack != back) editorChanged = true;
+        navigationPath = path; canBack = back;
+    }
     private Canvas canvas;
     private long generation = -1, paintedRevision = -1;
     private int hovered = -2;
@@ -59,8 +70,11 @@ public final class AuiRadialRenderer implements RadialRenderer {
         document.setManuallyRendered(true);
         root = document.getElementById("radial"); slots = document.getElementById("slots");
         label = document.getElementById("label"); denial = document.getElementById("denial");
+        center = document.getElementById("center-title"); breadcrumb = document.getElementById("breadcrumb");
+        backIcon = document.getElementById("center-back");
         Element element = document.getElementById("ring");
-        if (root == null || slots == null || label == null || denial == null || !(element instanceof Canvas)) return false;
+        if (root == null || slots == null || label == null || denial == null || center == null
+            || breadcrumb == null || backIcon == null || !(element instanceof Canvas)) return false;
         canvas = (Canvas) element; generation = document.getRefreshGeneration();
         paintedRevision = -1; hovered = -2; width = height = -1; animation = progress = -1; nodes.clear();
         return true;
@@ -121,6 +135,20 @@ public final class AuiRadialRenderer implements RadialRenderer {
                 }
                 node.setAttribute("data-texture", source);
             }
+            Element caption = node.children.stream().filter(ch -> "caption".equals(ch.getAttribute("data-kind"))).findFirst().orElse(null);
+            if (caption == null) {
+                caption = document.createElement("div"); caption.setAttribute("data-kind", "caption");
+                caption.setAttribute("class", "radial-caption"); caption = node.appendChild(caption);
+            }
+            String name = visual.label().getString().replaceAll("§.", "").split("[（(]")[0].trim();
+            caption.setTextContent(name.length() > 8 ? name.substring(0, 7) + "…" : name);
+            caption.setAttribute("style", "display:" + (editorHint == null ? "block" : "none") + ";");
+            Element directory = node.children.stream().filter(ch -> "directory".equals(ch.getAttribute("data-kind"))).findFirst().orElse(null);
+            if (directory == null) {
+                directory = document.createElement("div"); directory.setAttribute("data-kind", "directory");
+                directory.setAttribute("class", "radial-directory"); directory = node.appendChild(directory);
+            }
+            directory.setTextContent(slot.navigation() ? "›" : "");
         }
         positionIcons(animation);
     }
@@ -143,14 +171,23 @@ public final class AuiRadialRenderer implements RadialRenderer {
         label.setTextContent(editorHint == null ? selected == null ? menu.title().getString() : selected.value().label().getString()
             : editorHint);
         denial.setAttribute("class", "radial-denial" + (selected != null && !selected.enabled() ? " unavailable" : ""));
-        denial.setTextContent(editorHint != null ? "滚轮旋转 · Enter保存 · Esc取消 · R重置"
+        denial.setTextContent(editorHint != null ? "Tab切换吸附 · 滚轮旋转 · Enter保存 · Esc取消 · R重置"
+            : inputHint != null ? (selected != null && !selected.enabled() ? selected.value().denial().getString() + " · " : "") + inputHint
             : selected != null && !selected.enabled() ? selected.value().denial().getString() + " · F6编辑"
             : selected != null && selected.repeatTicks() > 0 ? "按住左键操作 · 右键返回 · F6编辑"
+            : selected != null && selected.navigation() ? "左键进入分类 · 右键返回 · F6编辑"
             : "左键选择 · 右键返回 · F6编辑");
+        center.setTextContent(menu.title().getString());
+        center.setAttribute("style", "left:" + (width / 2 - 38) + "px;top:" + (height / 2 - (canBack ? 19 : 5)) + "px;width:76px;");
+        breadcrumb.setTextContent(editorHint != null ? "布局编辑" : navigationPath);
+        breadcrumb.setAttribute("style", "left:" + (width / 2 - 180) + "px;top:"
+            + (height / 2 - menu.layout().outerRadius() - 22) + "px;width:360px;");
+        backIcon.setAttribute("style", "left:" + (width / 2 - 10) + "px;top:" + (height / 2 + 3)
+            + "px;width:20px;height:20px;display:" + (canBack && editorHint == null ? "block" : "none") + ";");
         double labelTop = menu.layout().outerRadius() + 16;
         // Keep all overlay positions in the same document coordinate space as the ring.
         // AUI absolute positioning does not match browser negative-margin centering.
-        double textWidth = editorHint == null ? 240 : Math.min(440, width - 16);
+        double textWidth = editorHint == null ? 240 : Math.min(500, width - 16);
         String labelLeft = "left:" + (width - textWidth) / 2 + "px;width:" + textWidth + "px;";
         label.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop) + "px;margin:0;");
         denial.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop + 28) + "px;margin:0;");
@@ -207,9 +244,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
             ctx.beginPath(); ctx.moveTo(c + Math.cos(a) * inner, c + Math.sin(a) * inner);
             ctx.lineTo(c + Math.cos(a) * outer, c + Math.sin(a) * outer); ctx.stroke();
         }
-        // The outer outline stays visible even with no selection or active operation.
-        ctx.setStrokeStyle("rgba(226,234,229,0.8)"); ctx.setLineWidth(0.75);
-        ctx.beginPath(); ctx.arc(c, c, outer, 0, Math.PI * 2); ctx.stroke();
+        // Squad's bright outer rim belongs only to the hovered sector.
         ctx.setStrokeStyle("rgba(216,225,219,0.52)"); ctx.setLineWidth(0.65);
         ctx.beginPath(); ctx.arc(c, c, inner, 0, Math.PI * 2); ctx.stroke();
         // The center track hugs the inside edge. A game-owned progress can continue here

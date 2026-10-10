@@ -70,7 +70,13 @@ public final class RadialMenuBuilder {
         var slot = last(); var v = slot.value();
         slots.set(slots.size() - 1, new RadialSession.Slot<>(slot.id(), new RadialMenuData.Visual(v.label(),
                 v.texture(), v.item(), v.nativeIcon(), v.color(), v.highlight(), reason), false,
-                slot.closeAfterAction(), slot.repeatTicks(), slot.action())); return this;
+                slot.closeAfterAction(), slot.repeatTicks(), slot.action(), slot.navigation())); return this;
+    }
+    /** A directory: click enters; releasing an opening key can never enter it. */
+    public RadialMenuBuilder submenuLast() {
+        var slot = last();
+        slots.set(slots.size() - 1, new RadialSession.Slot<>(slot.id(), slot.value(), slot.enabled(),
+            false, 0, slot.action(), true)); return this;
     }
     public RadialMenuBuilder repeatLast(int intervalTicks) {
         if (intervalTicks < 1) throw new IllegalArgumentException("Repeat interval must be positive");

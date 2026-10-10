@@ -21,6 +21,7 @@ public final class RadialLayoutEditorScreen extends Screen {
     private AuiRadialRenderer renderer;
     private int dragged = -1, boundary = -1;
     private String message = "";
+    private RadialLayoutEditor.Snap snap = RadialLayoutEditor.Snap.BOTH;
 
     public RadialLayoutEditorScreen(RadialMenuData defaults, RadialMenuData current) {
         super(Component.literal("轮盘布局编辑"));
@@ -55,7 +56,11 @@ public final class RadialLayoutEditorScreen extends Screen {
         String selected = piece < 0 ? "拖动扇区调位置 · 拖动分界调大小"
             : preview.layout().sectors().get(piece).slotIndex() < 0 ? "空槽 · 可拖动调整位置和大小"
             : preview.slots().get(preview.layout().sectors().get(piece).slotIndex()).value().label().getString() + " · 拖动调整位置";
-        renderer.setEditorHint(message.isEmpty() ? selected : message, piece);
+        String snapping = switch (snap) {
+            case BOTH -> "30°/45°吸附"; case THIRTY -> "30°吸附";
+            case FORTY_FIVE -> "45°吸附"; case FREE -> "自由调整";
+        };
+        renderer.setEditorHint((message.isEmpty() ? selected : message) + " · " + snapping, piece);
         renderer.setEditorDrag(dragged, x, y);
         try {
             renderer.update(preview, session, 1);
@@ -77,7 +82,7 @@ public final class RadialLayoutEditorScreen extends Screen {
         double x = mouseX - width / 2.0, y = mouseY - height / 2.0;
         if (boundary >= 0) {
             if (Math.hypot(x, y) >= preview.layout().innerRadius() / 2)
-                editor.resizeBoundary(boundary, RadialLayoutEditor.angle(x, y));
+                editor.resizeBoundary(boundary, RadialLayoutEditor.angle(x, y), snap);
             refresh();
         }
         return true;
@@ -90,9 +95,13 @@ public final class RadialLayoutEditorScreen extends Screen {
         dragged = boundary = -1; return true;
     }
     @Override public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        editor.rotate(delta * 5); refresh(); return true;
+        editor.rotateSnapped(delta > 0 ? 1 : delta < 0 ? -1 : 0, snap); refresh(); return true;
     }
     @Override public boolean keyPressed(int key, int scanCode, int modifiers) {
+        if (key == GLFW.GLFW_KEY_TAB) {
+            snap = RadialLayoutEditor.Snap.values()[(snap.ordinal() + 1) % RadialLayoutEditor.Snap.values().length];
+            message = ""; return true;
+        }
         if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
             try {
                 RadialLayouts.save(preview);

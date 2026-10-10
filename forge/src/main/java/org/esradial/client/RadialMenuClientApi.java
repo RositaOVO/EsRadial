@@ -176,6 +176,9 @@ public final class RadialMenuClientApi {
         if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             try {
                 updateHover();
+                if (event.getAction() == GLFW.GLFW_PRESS && isCenterHovered() && !history.isEmpty()) {
+                    back(); session.seedPrimary(true); return;
+                }
                 session.updatePrimary(event.getAction() == GLFW.GLFW_PRESS);
             } catch (RuntimeException error) {
                 LogUtils.getLogger().error("EsRadial action failed", error);
@@ -192,6 +195,10 @@ public final class RadialMenuClientApi {
     private static void render(RenderGuiEvent.Post event) {
         if (session == null) return;
         try {
+            var path = new java.util.ArrayList<String>();
+            history.descendingIterator().forEachRemaining(p -> path.add(p.title().getString()));
+            path.add(menu.title().getString());
+            renderer.setNavigation(String.join(" / ", path), !history.isEmpty());
             updateHover(); renderer.update(menu, session, animation());
             renderer.render(event.getGuiGraphics());
         } catch (RuntimeException error) {
