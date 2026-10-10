@@ -6,20 +6,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RadialBackButtonTest {
-    @Test void buttonHitBoxMatchesItsVisibleExtentAndIsAboveRing() {
-        for (double radius : new double[] {64,96,120}) {
-            var button = RadialBackButton.above(radius,400);
-            assertTrue(button.top() + button.height() < -radius);
+    @Test void buttonHitBoxFitsInsideUpperCentralDisk() {
+        for (double radius : new double[] {20,32,44,64}) {
+            var button = RadialBackButton.inside(radius);
+            assertTrue(button.top() + button.height() < 0);
+            for(double x : new double[]{button.left(),button.left()+button.width()})
+                for(double y : new double[]{button.top(),button.top()+button.height()})
+                    assertTrue(Math.hypot(x,y) < radius);
             assertTrue(button.contains(button.left(),button.top()));
-            assertTrue(button.contains(0,button.top()+10));
+            assertTrue(button.contains(0,button.top()+button.height()/2));
             assertFalse(button.contains(button.left()+button.width(),button.top()));
             assertFalse(button.contains(0,button.top()+button.height()));
             assertFalse(button.contains(Double.NaN,button.top()));
         }
     }
-    @Test void buttonStaysVisibleInShortViewport() {
-        var b = RadialBackButton.above(120,240);
-        assertEquals(8,b.top()+120);
+    @Test void buttonShrinksWithTheCentralDisk() {
+        assertTrue(RadialBackButton.inside(32).width() < RadialBackButton.inside(44).width());
     }
     @Test void returningDoesNotExecuteParentActionOnHeldPrimary() {
         var actions = new AtomicInteger();

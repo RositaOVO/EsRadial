@@ -13,6 +13,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import org.esradial.core.RadialSession;
 import org.esradial.core.RadialBackButton;
 import org.esradial.core.RadialCanvasResolution;
+import org.esradial.core.RadialCaptionBounds;
+import org.esradial.core.RadialViewSizing;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,6 +31,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
     private Element root, slots, label, denial, center, breadcrumb, backButton;
     private boolean backHovered;
     private int backingScale = 1;
+    private double viewScale = 1;
     private String navigationPath = "";
     private boolean canBack;
     private String inputHint;
@@ -84,32 +87,47 @@ public final class AuiRadialRenderer implements RadialRenderer {
         return true;
     }
     public double mouseX() {
-        Position p = document.getMouseDocumentPosition(); return p.x - document.getViewportSize().width() / 2;
+        Position p = document.getMouseDocumentPosition(); return (p.x - document.getViewportSize().width() / 2)/fitScale(menu);
     }
     public double mouseY() {
-        Position p = document.getMouseDocumentPosition(); return p.y - document.getViewportSize().height() / 2;
+        Position p = document.getMouseDocumentPosition(); return (p.y - document.getViewportSize().height() / 2)/fitScale(menu);
+    }
+    private double fitScale(RadialMenuData page) {
+        Size size=document.getViewportSize();
+        return RadialViewSizing.scale(page.layout().outerRadius(),size.width(),size.height());
+    }
+    public Position guiToWheel(double x,double y) {
+        Position p=document.guiToDocumentPosition(new Position(x,y)); Size size=document.getViewportSize();
+        double scale=fitScale(menu); return new Position((p.x-size.width()/2)/scale,(p.y-size.height()/2)/scale);
+    }
+    public Position wheelToGui(double x,double y) {
+        Size size=document.getViewportSize(); double scale=fitScale(menu);
+        return document.documentToGuiPosition(new Position(size.width()/2+x*scale,size.height()/2+y*scale));
     }
     public boolean isBackButtonHovered(RadialMenuData page, boolean back) {
         return back && editorHint == null && document != null
-            && RadialBackButton.above(page.layout().outerRadius(), document.getViewportSize().height())
-                .contains(mouseX(), mouseY());
+            && RadialBackButton.inside(page.layout().innerRadius()*fitScale(page))
+                .contains(document.getMouseDocumentPosition().x-document.getViewportSize().width()/2,
+                    document.getMouseDocumentPosition().y-document.getViewportSize().height()/2);
     }
     public void update(RadialMenuData menu, RadialSession<RadialMenuData.Visual> session, double animation) {
         if (document == null || !document.isActive()) throw new IllegalStateException("AUI document is unavailable");
         if (generation != document.getRefreshGeneration() && !bind()) throw new IllegalStateException("Invalid radial template after reload");
         this.menu = menu; this.session = session;
         Size size = document.getViewportSize();
+        double nextViewScale=fitScale(menu);
         var window = net.minecraft.client.Minecraft.getInstance().getWindow();
         Position unit = document.documentToGuiPosition(new Position(1, 0));
         Position zero = document.documentToGuiPosition(new Position(0, 0));
-        int nextBackingScale = RadialCanvasResolution.scale((int) Math.ceil(menu.layout().outerRadius() * 2 + 8),
+        int nextBackingScale = RadialCanvasResolution.scale((int) Math.ceil(menu.layout().outerRadius()*nextViewScale * 2 + 8),
             unit.x - zero.x, window.getWidth(), window.getGuiScaledWidth());
         boolean resized = width != size.width() || height != size.height();
         boolean nextBackHovered = isBackButtonHovered(menu, canBack);
         boolean changed = resized || paintedRevision != session.revision() || editorChanged
-            || backHovered != nextBackHovered || backingScale != nextBackingScale;
+            || backHovered != nextBackHovered || backingScale != nextBackingScale || viewScale != nextViewScale;
         backHovered = nextBackHovered;
         backingScale = nextBackingScale;
+        viewScale=nextViewScale;
         editorChanged = false;
         if (changed) {
             width = size.width(); height = size.height();
@@ -159,8 +177,8 @@ public final class AuiRadialRenderer implements RadialRenderer {
                 caption.setAttribute("class", "radial-caption"); caption = node.appendChild(caption);
             }
             String name = visual.label().getString().replaceAll("§.", "").split("[（(]")[0].trim();
-            caption.setTextContent(name.length() > 8 ? name.substring(0, 7) + "…" : name);
-            caption.setAttribute("style", "display:" + (editorHint == null ? "block" : "none") + ";");
+            // The enemy directory and red icon already communicate affiliation.
+            caption.setAttribute("data-caption", name.replaceFirst("^敌方", ""));
             Element directory = node.children.stream().filter(ch -> "directory".equals(ch.getAttribute("data-kind"))).findFirst().orElse(null);
             if (directory == null) {
                 directory = document.createElement("div"); directory.setAttribute("data-kind", "directory");
@@ -171,51 +189,74 @@ public final class AuiRadialRenderer implements RadialRenderer {
         positionIcons(animation);
     }
     private void positionIcons(double animation) {
+        animation *= viewScale;
         int count = session.page().slots().size();
         for (int i = 0; i < count; i++) {
             var slot = session.page().slots().get(i); Element node = nodes.get(slot.id());
+            var bounds=RadialCaptionBounds.forSlot(menu.layout(),i,count,animation);
             double x = width / 2 + menu.layout().slotX(i, count) * animation;
             double y = height / 2 + menu.layout().slotY(i, count) * animation;
+            if (editorHint == null) y += bounds.iconOffsetY();
             if (editorDragged >= 0 && menu.layout().sectors().get(editorDragged).slotIndex() == i) {
-                x = width / 2 + editorDragX; y = height / 2 + editorDragY;
+                x = width / 2 + editorDragX*viewScale; y = height / 2 + editorDragY*viewScale;
             }
             node.setAttribute("style", "left:" + (x - 16) + "px;top:" + (y - 16) + "px;opacity:"
                     + animation * (slot.enabled() ? 1 : 0.35) + ";color:" + cssColor(slot.value().color()) + ";");
             node.setAttribute("class", "radial-slot" + (i == hovered ? " hovered" : "") + (!slot.enabled() ? " disabled" : ""));
+            Element caption = node.children.stream().filter(ch -> "caption".equals(ch.getAttribute("data-kind"))).findFirst().orElse(null);
+            if (caption != null) {
+                caption.setTextContent(fitText(caption.getAttribute("data-caption"), bounds.width(), 9, 600));
+                double logicalX = menu.layout().slotX(i, count) * animation;
+                double logicalY = menu.layout().slotY(i, count) * animation+bounds.iconOffsetY();
+                caption.setAttribute("style", "left:" + (bounds.left() - logicalX + 16) + "px;top:"
+                    + (bounds.top() - logicalY + 16) + "px;width:" + bounds.width()
+                    + "px;height:11px;display:" + (editorHint == null && bounds.width() > 0 ? "block" : "none") + ";");
+            }
         }
+    }
+    private static String fitText(String source, double width, double size, int weight) {
+        return RadialUiText.fit(source,width,size,weight);
     }
     private void updateLabels() {
         var selected = session.hovered();
-        label.setTextContent(editorHint == null ? selected == null ? menu.title().getString() : selected.value().label().getString()
-            : editorHint);
+        String footerLabel = editorHint == null ? selected == null ? menu.title().getString() : selected.value().label().getString()
+            : editorHint;
         denial.setAttribute("class", "radial-denial" + (selected != null && !selected.enabled() ? " unavailable" : ""));
         denial.setTextContent(editorHint != null ? "Tab切换吸附 · 滚轮旋转 · Enter保存 · Esc取消 · R重置"
             : inputHint != null ? (selected != null && !selected.enabled() ? selected.value().denial().getString() + " · " : "") + inputHint
             : selected != null && !selected.enabled() ? selected.value().denial().getString() + " · F6编辑"
             : selected != null && selected.repeatTicks() > 0 ? "按住左键操作 · Esc取消 · F6编辑"
-            : selected != null && selected.navigation() ? "左键进入分类 · 上方返回 · Esc取消 · F6编辑"
-            : "左键选择 · 上方返回 · Esc取消 · F6编辑");
-        center.setTextContent(menu.title().getString());
-        center.setAttribute("style", "left:" + (width / 2 - 38) + "px;top:" + (height / 2 - 5) + "px;width:76px;");
-        breadcrumb.setTextContent(editorHint != null ? "布局编辑" : navigationPath);
-        breadcrumb.setAttribute("style", "left:" + (width / 2 - 180) + "px;top:"
-            + Math.max(0, height / 2 - menu.layout().outerRadius() - (canBack ? 42 : 22)) + "px;width:360px;");
-        var button = RadialBackButton.above(menu.layout().outerRadius(), height);
+            : selected != null && selected.navigation() ? "左键进入分类 · 内圈返回 · Esc取消 · F6编辑"
+            : "左键选择 · 内圈返回 · Esc取消 · F6编辑");
+        double centerWidth=Math.min(76,menu.layout().innerRadius()*viewScale*2-14);
+        center.setTextContent(fitText(menu.title().getString(),centerWidth,10,600));
+        center.setAttribute("style", "left:" + ((width-centerWidth)/2) + "px;top:" + (height / 2 + (canBack && editorHint == null ? 5 : -5)) + "px;width:"+centerWidth+"px;");
+        double pathWidth = Math.min(360,Math.max(0,width-16));
+        breadcrumb.setTextContent(fitText(editorHint != null ? "布局编辑" : navigationPath,pathWidth,9,500));
+        breadcrumb.setAttribute("style", "left:" + ((width-pathWidth)/2) + "px;top:"
+            + Math.max(0, height / 2 - menu.layout().outerRadius()*viewScale - 22) + "px;width:"+pathWidth+"px;");
+        var button = RadialBackButton.inside(menu.layout().innerRadius()*viewScale);
         backButton.setAttribute("style", "left:" + (width / 2 + button.left()) + "px;top:" + (height / 2 + button.top())
             + "px;width:" + button.width() + "px;height:" + button.height() + "px;background:"
             + (backHovered ? "rgba(128,142,141,0.85)" : "rgba(33,45,47,0.88)")
             + ";display:" + (canBack && editorHint == null ? "block" : "none") + ";");
-        double labelTop = menu.layout().outerRadius() + 16;
+        document.getElementById("center-back").setAttribute("style", "left:" + (button.width()/2-17)
+            + "px;top:" + ((button.height()-9)/2) + "px;width:9px;height:9px;");
+        document.getElementById("back-label").setAttribute("style", "left:" + (button.width()/2-4)
+            + "px;top:" + ((button.height()-11)/2) + "px;width:22px;height:11px;");
+        double labelTop = menu.layout().outerRadius()*viewScale + 12;
         // Keep all overlay positions in the same document coordinate space as the ring.
         // AUI absolute positioning does not match browser negative-margin centering.
-        double textWidth = editorHint == null ? 240 : Math.min(500, width - 16);
+        double textWidth = Math.min(editorHint == null ? 240 : 500, width - 16);
+        label.setTextContent(fitText(footerLabel, textWidth, 12, 600));
         String labelLeft = "left:" + (width - textWidth) / 2 + "px;width:" + textWidth + "px;";
         label.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop) + "px;margin:0;");
-        denial.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop + 28) + "px;margin:0;");
+        denial.setAttribute("style", labelLeft + "top:" + (height / 2 + labelTop + 26) + "px;margin:0;");
         root.setAttribute("style", "opacity:" + this.animation + ";");
     }
     private void drawRing(double animation) {
-        int extent = (int) Math.ceil(menu.layout().outerRadius() * 2 + 8);
+        animation *= viewScale;
+        int extent = (int) Math.ceil(menu.layout().outerRadius()*viewScale * 2 + 8);
         int pixels = extent * backingScale;
         if (canvas.getWidth() != pixels) canvas.setWidth(pixels);
         if (canvas.getHeight() != pixels) canvas.setHeight(pixels);
@@ -243,7 +284,7 @@ public final class AuiRadialRenderer implements RadialRenderer {
         if (editorHint != null) {
             if (editorDragged >= 0 && sectors.get(editorDragged).slotIndex() < 0) {
                 ctx.setStrokeStyle("rgba(245,210,110,0.95)"); ctx.setLineWidth(2);
-                ctx.beginPath(); ctx.arc(c + editorDragX, c + editorDragY, 6, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(c + editorDragX*viewScale, c + editorDragY*viewScale, 6, 0, Math.PI * 2); ctx.stroke();
             }
             if (editorPiece >= 0 && editorPiece < sectors.size()) {
                 var area = sectors.get(editorPiece);
@@ -330,9 +371,10 @@ public final class AuiRadialRenderer implements RadialRenderer {
         for (int i = 0; i < count; i++) {
             var slot = session.page().slots().get(i); var v = slot.value();
             if (v.item().isEmpty() && v.nativeIcon() == null) continue;
-            double x = menu.layout().slotX(i, count) * animation, y = menu.layout().slotY(i, count) * animation;
+            double x = menu.layout().slotX(i, count) * animation*viewScale, y = menu.layout().slotY(i, count) * animation*viewScale;
+            if (editorHint == null) y += RadialCaptionBounds.forSlot(menu.layout(),i,count,animation*viewScale).iconOffsetY();
             if (editorDragged >= 0 && menu.layout().sectors().get(editorDragged).slotIndex() == i) {
-                x = editorDragX; y = editorDragY;
+                x = editorDragX*viewScale; y = editorDragY*viewScale;
             }
             Position center = document.documentToGuiPosition(new Position(width / 2 + x, height / 2 + y));
             Position unit = document.documentToGuiPosition(new Position(1, 0));

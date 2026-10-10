@@ -9,7 +9,7 @@
 - 按住调用模组的轮盘键打开；向图标所在方向移动鼠标即可选中，移到圆环外也有效。
 - 左键点击执行；点击菜单入口进入子菜单，保持同一个 Overlay，不会关了再闪一下。
 - 松开打开键只关闭轮盘，不执行选项。库也支持由方块右键打开的普通点击模式。
-- 点击轮盘上方的返回按钮回到上一级；右键不执行导航。Esc、死亡、断线、打开其他 Screen、失去窗口焦点也会结束会话。
+- 点击轮盘内圈上半部的返回按钮回到上一级；右键不执行导航。Esc、死亡、断线、打开其他 Screen、失去窗口焦点也会结束会话。
 - 中心是安全区，不选中外围选项。Espetro 的载具中心额外由原有上车系统提供左键读条。
 - 持续操作选项支持按住左键重复执行；松开左键、移到中心或不可用项目就停止。
 - AUI 圆环画布按实际屏幕像素密度绘制，缩放 GUI 时同步调整清晰度，鼠标仍使用同一逻辑坐标。
@@ -71,7 +71,7 @@ RadialMenuClientApi.open(root,
 
 可在游戏目录的 `apricity/esradial/` 用同名 HTML/CSS 覆盖默认外观。保留 `radial`、`ring`（canvas）、`slots`、`label`、`denial`、`center-title`、`breadcrumb`、`back-button`、`center-back`、`back-label` 的 DOM ID 和页面 meta。改变颜色、字体、边距不需要改 Espetro 的网络代码。
 
-大幅改布局时，客户端可调用 `setRendererFactory(() -> new AuiRadialRenderer("mymod/custom.html"))`，或实现 `RadialRenderer`。命中检测与绘制必须使用同一逻辑坐标系。自定义渲染器应实现 `isBackButtonHovered(menu, canBack)`，默认 AUI 模板使用 `RadialBackButton.above` 共享返回按钮的绘制与命中区域。
+大幅改布局时，客户端可调用 `setRendererFactory(() -> new AuiRadialRenderer("mymod/custom.html"))`，或实现 `RadialRenderer`。命中检测与绘制必须使用同一逻辑坐标系。自定义渲染器应实现 `isBackButtonHovered(menu, canBack)`，默认 AUI 模板使用 `RadialBackButton.inside` 共享返回按钮的绘制与命中区域。
 
 ## 构建
 
@@ -87,8 +87,12 @@ RadialMenuClientApi.open(root,
 
 ## 验证状态
 
-39项核心与布局配置测试通过，包含30°/45°倍数吸附、跨0°边界、空槽、分类点击及松键取消。Forge/AUI源码已使用Java17、真实Forge映射和ApricityUI1.2.6编译。
+48项核心与布局配置测试通过，包含30°/45°倍数吸附、跨0°边界、空槽、分类点击及松键取消。Forge/AUI源码已使用Java17、真实Forge映射和ApricityUI1.2.6编译。
 
-实际Minecraft联机客户端验证了目录下钻、图标、松键取消、编辑拖动、保存/取消、配置重读与恢复默认；地图嵌入轮盘验证打开、Esc退出及父界面关闭后清理Document。EsPoints另有15项相关测试、Espetro15项适配/权限分类测试通过。
+实际Minecraft联机客户端验证了目录下钻、图标、松键取消、编辑拖动、保存/取消、配置重读与恢复默认；地图嵌入轮盘验证打开、Esc退出及父界面关闭后清理Document。EsPoints另有23项相关测试、Espetro15项适配/权限分类测试通过。
 
 Espetro试玩包使用历史完整基线32d67bb接入本次控制器与载具快照API；PR基于最新1.20.1代码。最新4ae5012仍缺FixedWeaponWheelPacket源码和DragonRise依赖，完整编译未通过。试玩包不能等同于最新分支正式发行包。本机ForgeGradle依赖元数据解析仍有限制，测试包使用Java17、Mixin注解处理与Forge名称映射构建。
+
+## 字体和尺寸适配
+
+默认使用 ApricityUI 平滑字体，优先读取系统微软雅黑，回退 Noto Sans CJK SC / sans-serif。字体按实际屏幕像素密度绘制，不随圆环贴图放大。图标名称在所属扇区的可用范围内排版，长名称省略，悬停显示完整名称。自动 GUI 比例下轮盘缩小并预留顶部路径与底部提示空间；编辑拖动与按钮命中使用相同缩放。返回按钮在中心圆的上半部，当前分类在下半部，右键不导航。

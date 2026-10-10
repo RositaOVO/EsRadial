@@ -50,7 +50,7 @@ public final class RadialLayoutEditorScreen extends Screen {
     }
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (renderer == null) return;
-        double x = mouseX - width / 2.0, y = mouseY - height / 2.0;
+        var point=renderer.guiToWheel(mouseX,mouseY); double x=point.x,y=point.y;
         int piece = editor.pieceAt(x, y);
         session.hover(x, y);
         String selected = piece < 0 ? "拖动扇区调位置 · 拖动分界调大小"
@@ -71,7 +71,7 @@ public final class RadialLayoutEditorScreen extends Screen {
     }
     @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true;
-        double x = mouseX - width / 2.0, y = mouseY - height / 2.0;
+        var point=renderer.guiToWheel(mouseX,mouseY); double x=point.x,y=point.y;
         boundary = editor.boundaryAt(x, y);
         dragged = boundary < 0 ? editor.pieceAt(x, y) : -1;
         message = "";
@@ -79,7 +79,7 @@ public final class RadialLayoutEditorScreen extends Screen {
     }
     @Override public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true;
-        double x = mouseX - width / 2.0, y = mouseY - height / 2.0;
+        var point=renderer.guiToWheel(mouseX,mouseY); double x=point.x,y=point.y;
         if (boundary >= 0) {
             if (Math.hypot(x, y) >= preview.layout().innerRadius() / 2)
                 editor.resizeBoundary(boundary, RadialLayoutEditor.angle(x, y), snap);
@@ -89,7 +89,7 @@ public final class RadialLayoutEditorScreen extends Screen {
     }
     @Override public boolean mouseReleased(double x, double y, int button) {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && dragged >= 0) {
-            int target = editor.pieceAt(x - width / 2.0, y - height / 2.0);
+            var point=renderer.guiToWheel(x,y); int target=editor.pieceAt(point.x,point.y);
             if (target >= 0) { editor.move(dragged, target); refresh(); }
         }
         dragged = boundary = -1; return true;
