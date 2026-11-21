@@ -70,6 +70,17 @@ RadialMenuClientApi.open(root,
 
 可选 `RadialMenuRegistry.setMenus(owner, menus)` 管理静态菜单。更新页面保留稳定的按钮 ID；不要每 tick 重建页面。一次会话持有一个 AUI Document，资源重载后重新绑定失效的 DOM 节点。
 
+## 右侧提示（Toast）
+
+`org.esradial.client.toast.EsToasts` 提供屏幕右侧中间滑入的短提示，可替代 AuraTip 的提示卡片。同一时间只显示一条，新提示会替换旧提示。没有打开界面时画在 HUD 上，打开界面时画在界面上层，所以菜单里的拒绝原因也看得见。
+
+```java
+EsToasts.show(ToastSpec.error(Component.literal("无法补给"), Component.literal("补给点已耗尽")));
+EsToasts.show(ToastSpec.info(title, body).withHoldTicks(80));
+```
+
+默认外观：248×88，深色实底 `#EE111416`，左侧 3px 色条（`info` 金色 `#E0B85A`，`error` 红色 `#E05A5A`），从右缘外滑入 220ms，停留 50 tick（约 2.5 秒），鼠标悬停时暂停计时。正文按宽度换行，放不下时末行以 `…` 结尾。可用 `withSize`、`withAccent`、`withBackground`、`withHoldTicks`、`withSlideMillis`、`withPauseOnHover` 调整。时间线逻辑在 `core` 的 `ToastTimeline`，可单独测试。
+
 ## 以后换 UI
 
 默认资源逻辑路径是 `esradial/radial.html`。资源放在 `assets/apricityui/apricity/esradial/`，兼容 AUI 1.2.6 的 classpath 资源回退路径。

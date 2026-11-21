@@ -7,7 +7,9 @@ import net.minecraftforge.fml.common.Mod;
 @Mod("esradial")
 public final class EsRadial {
     public EsRadial() {
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                org.esradial.client.RadialMenuClientApi.initialize());
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+            org.esradial.client.RadialMenuClientApi.initialize();
+            org.esradial.client.toast.EsToasts.initialize();
+        });
     }
 }
